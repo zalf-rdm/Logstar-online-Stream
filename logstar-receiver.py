@@ -7,7 +7,7 @@ import logging
 import os
 import json
 import sys
-from src.database_connector import PSQL_DB
+from src.postgres_connector import PSQL_DB
 
 '''
 	API DOCs
@@ -84,6 +84,7 @@ def download_data(conf,station):
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-c",type=argparse.FileType('r', encoding='UTF-8'),help="pass config via config file, default via env")
+	#parser.add_argument("-dry-run",type=argparse.FileType('r', encoding='UTF-8'),help="dry run downloads data but does not interact with database ...")
 
 	# logging
 	parser.add_argument("-log",help="Redirect logs to a given file in addition to the console.",metavar='')
@@ -142,7 +143,6 @@ def main():
 			continue
 		psql_conn.create_table(station,dict_request['header'])
 		psql_conn.insert_data(station,dict_request)
-		break
 	psql_conn.disconnect()
 
 if __name__ == '__main__':

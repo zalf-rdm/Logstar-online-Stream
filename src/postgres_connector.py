@@ -33,14 +33,19 @@ class PSQL_DB:
         self.cur.close()
 
     def __build_create_command__(self,table_name,header):
-        command = "CREATE TABLE \"{}\" (".format(table_name)
+        column_names = ""
+        first = True
         for k in header.keys():
-            if k == "date":
-                command += "\"col_date\" date,".format(header[k])
-            elif k == "time": # time is always the last
-                command += "\"col_time\" time, PRIMARY KEY (col_date, col_time));".format(header[k])
+            if k == "date" or k == "time":
+                continue
+            
+            if not first:
+                column_names += ","
             else:
-                command += "\"{}\" float,".format(header[k])
+                first = False
+            column_names += "\"{}\" float".format(header[k])
+        
+        command = "CREATE TABLE \"{}\" ({}, \"timestamp\" timestamp PRIMARY KEY);".format(table_name,column_names)
         return command
 
     def create_table(self,station,header):
@@ -62,22 +67,24 @@ class PSQL_DB:
         first = True
         header_list = list(header.keys())
         for k,v in row.items():
+            if k == "date" or  k == "time":
+                continue
+
             if not first:
                 keys += ","
                 values += ","
             else: 
                 first = False
             
-            if k == "date":
-                keys += " \"{}\"".format("col_date")
-
-            elif k == "time":
-                keys += " \"{}\"".format("col_time")
+            keys += " \"{}\"".format(header[k])
+            if v is None:
+                values += " \'{}\'".format("NaN")
             else:
-                keys += " \"{}\"".format(header[k])
-            values += " \'{}\'".format(v)
-
-        command = "INSERT INTO {} ({}) VALUES ({});".format(table_name,keys,values)
+                values += " \'{}\'".format(v)
+        timestamp = row['date'] + " " + row['time']
+        keys += ", \"timestamp\""
+        values += ", \'{}\'".format(timestamp)
+        command = "INSERT INTO \"{}\" ({}) VALUES ({});".format(table_name,keys,values)
         return command
 
     def insert_data(self,station,dict_all):
@@ -92,7 +99,9 @@ class PSQL_DB:
                 sucessful += 1
             except:
                 logging.debug("Execution of: \"{}\" failed ...".format(command))
-                return
+            finally:    
+                self.conn.commit()
+                
         logging.info("Inserted {} / {} columns of data".format(sucessful,len(dict_all["data"])))
-        self.conn.commit()
+        #self.conn.commit()
         self.cur.close()
