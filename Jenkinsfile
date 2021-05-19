@@ -6,11 +6,11 @@ pipeline {
         registryCredential = "hub.docker.com"
     }
     stages {
-        stage('prepare  ') {
-            steps{
-                sh 'apt-get -y install docker'
-            }
-        }
+        // stage('prepare  ') {
+        //     steps{
+        //         sh 'apt-get -y install docker'
+        //     }
+        // }
         stage('Building image') {
             steps{
                 script {
@@ -19,9 +19,12 @@ pipeline {
             }
         }
         stage('Deploy Image') {
-                steps {
-                    script {
-                        docker.withRegistry( '', registryCredential ) {
+            // when {
+                //  branch 'master'
+            // }
+            steps {
+                script {
+                    docker.withRegistry( '', registryCredential ) {
                         dockerImage.push()
                     }
                 }
