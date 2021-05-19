@@ -1,5 +1,7 @@
 #!/bin/bash
 
+CMD="python /Logstar-online-Stream/logstar-receiver.py"
+
 # handle debug mode (-v)
 if [[ -v LOGSTAR_DEBUG ]]; then
     LOGSTAR_DEBUG="-v"
@@ -12,6 +14,6 @@ if [[ -v LOGSTAR_LOGFILE ]]; then
     LOGSTAR_LOGGING="-log $LOGSTAR_LOGFILE"
 else
     LOGSTAR_LOGGING=""
+fi
 
-python /Logstar-online-Stream/logstar-receiver.py $LOGSTAR_DEBUG $LOGSTAR_LOGGING $LOGSTAR_PARAMS
-
+$CMD"$LOGSTAR_DEBUG" "$LOGSTAR_LOGGING" "$LOGSTAR_PARAMS"
