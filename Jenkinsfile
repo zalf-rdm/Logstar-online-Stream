@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('prepare  ') {
             steps{
-                sh 'apt-get install docker'
+                sh 'apt-get -y install docker'
             }
         }
         stage('Building image') {
