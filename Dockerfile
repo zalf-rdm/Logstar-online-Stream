@@ -8,4 +8,4 @@ WORKDIR "/Logstar-online-Stream"
 RUN python -m pip install -r requirements.txt
 RUN chmod +x /Logstar-online-Stream/entrypoint.sh
 
-ENTRYPOINT /Logstar-online-Stream/entrypoint.sh
+CMD /Logstar-online-Stream/entrypoint.sh
