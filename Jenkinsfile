@@ -8,8 +8,9 @@ pipeline {
     stages {
         stage('prepare  ') {
             steps{
+                sh 'apt-get install -y lsb-release'
                 sh 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null'
-                sh ' apt-get update && apt-get -y install docker-ce docker-ce-cli containerd.io'
+                sh 'apt-get update && apt-get -y install docker-ce docker-ce-cli containerd.io'
             }
         }
         stage('Building image') {
