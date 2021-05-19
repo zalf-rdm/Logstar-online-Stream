@@ -13,4 +13,3 @@ else
 
 python /Logstar-online-Stream/logstar-receiver.py $LOGSTAR_DEBUG $LOGSTAR_LOGGING $LOGSTAR_PARAMS
 
-
