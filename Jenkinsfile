@@ -6,11 +6,12 @@ pipeline {
         registryCredential = "hub.docker.com"
     }
     stages {
-        // stage('prepare  ') {
-        //     steps{
-        //         sh 'apt-get -y install docker'
-        //     }
-        // }
+        stage('prepare  ') {
+            steps{
+                sh 'apt-get -y install docker'
+                sh 'which docker'
+            }
+        }
         stage('Building image') {
             steps{
                 script {
