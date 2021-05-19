@@ -24,9 +24,9 @@ pipeline {
             }
         }
         stage('Deploy Image') {
-            // when {
-                //  branch 'master'
-            // }
+            when {
+                 branch 'master'
+            }
             steps {
                 script {
                     docker.withRegistry( '', registryCredential ) {
