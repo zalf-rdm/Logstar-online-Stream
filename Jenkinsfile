@@ -26,7 +26,7 @@ pipeline {
         }
         stage('Deploy Image') {
             when {
-                 branch 'master'
+                branch 'master'
             }
             steps {
                 script {
@@ -37,6 +37,9 @@ pipeline {
             }
         }
         stage('Remove Unused docker image') {
+            when {
+                branch 'master'
+            }
             steps {
                 sh "docker rmi $registry:$version.$BUILD_NUMBER"
             }
