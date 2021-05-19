@@ -1,0 +1,3 @@
+argparse
+requests
+psycopg2
