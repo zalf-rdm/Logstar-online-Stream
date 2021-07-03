@@ -1,4 +1,4 @@
-FROM python:3.9.5-slim-buster
+FROM mwall2bitflow/odbc_base
 
 RUN apt-get update && apt-get -y install git
 WORKDIR "/"

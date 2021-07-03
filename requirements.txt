@@ -1,3 +1,4 @@
 argparse
 requests
-psycopg2-binary
+pyodbc==4.0.30
+psycopg2

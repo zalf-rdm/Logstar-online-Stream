@@ -7,17 +7,13 @@ import logging
 import os
 import json
 import sys
-from src.postgres_connector import PSQL_DB
+from src.db_connector import MSSQLConnector,PSQLConnector 
 
 '''
 	API DOCs
 	http://dokuwiki.weather-station-data.com/doku.php?id=:en:start 
 '''
 LOGSTAR_API_URL = "https://logstar-online.de/api"
-
-# TODO help 
-def print_help():
-    raise NotImplementedError("This function is not yet implemented, please use look into code to the code :-( ...")
 
 
 def configure_logging(debug,filename=None):
@@ -113,16 +109,17 @@ def main():
 			"datetime": os.environ.get('LOGSTAR_DAYTIME',0),
 			"startdate": os.environ.get('LOGSTAR_STARTDATE',"2021-01-01"),
 			"enddate": os.environ.get('LOGSTAR_ENDDATE',"2021-05-02"),
-			"postgres_host": os.environ.get('LOGSTAR_POSTGRES_HOST','localhost'),
-			"postgres_database": os.environ.get('LOGSTAR_POSTGRES_DBNAME','logstar'),
-			"postgres_user": os.environ.get('LOGSTAR_POSTGRES_USER','postgres'),
-			"postgres_password": os.environ.get('LOGSTAR_POSTGRES_PASS','postgres')
-		}
+			"db_host": os.environ.get('LOGSTAR_DB_HOST','localhost'),
+			"db_database": os.environ.get('LOGSTAR_DB_DBNAME','logstar'),
+			"db_driver": os.environ.get('LOGSTAR_DB_DRIVER','PostgreSQL'),
+			"db_username": os.environ.get('LOGSTAR_DB_USER','postgres'),
+			"db_password": os.environ.get('LOGSTAR_DB_PASS','postgres'),
+			"db_port": os.environ.get('LOGSTAR_DB_PORT','5432')
 
+		}
 		logging.debug("loaded environment variables:")
 		for key,value in conf.items():
 			logging.debug("\t{} -> \"{}\"".format(key,value))	
-		
 		try:
 			station_list = conf["stations"].split(" ")
 			conf["stationlist"] = station_list
@@ -131,9 +128,12 @@ def main():
 			sys.exit(1)
 	
 	# test database connection
+	if conf["db_driver"] == "PostgreSQL":
+		database = PSQLConnector(conf)
+	else:
+		database = MSSQLConnector(conf)
 	
-	psql_conn = PSQL_DB(conf)
-	if not psql_conn.connect():
+	if not database.connect():
 		sys.exit(1)
 
 	for station in conf["stationlist"]:
@@ -141,9 +141,9 @@ def main():
 		dict_request = download_data(conf,station)
 		if dict_request is None:
 			continue
-		psql_conn.create_table(station,dict_request['header'])
-		psql_conn.insert_data(station,dict_request)
-	psql_conn.disconnect()
+		database.create_table(station,dict_request['header'])
+		database.insert_data(station,dict_request)
+	database.disconnect()
 
 if __name__ == '__main__':
 	main()
