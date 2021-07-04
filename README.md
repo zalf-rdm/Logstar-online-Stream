@@ -6,7 +6,7 @@ API-Docs via http://dokuwiki.weather-station-data.com/doku.php?id=:en:start
 
 install psql-dev
 ```bash
-sudo apt install unixodbc-dev python3-dev
+sudo apt install unixodbc-dev python3-dev postgresql-server-dev-10
 ```
 
 install pip requirments
@@ -39,7 +39,7 @@ Run Grafana Container
 docker run --network host grafana/grafana
 ```
 
-## Start Programm
+## Start Program
 
 Run programm in download mode. Downloads data in from startdate to enddate and stores it in the database
 ```bash
