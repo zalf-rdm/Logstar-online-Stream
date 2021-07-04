@@ -17,12 +17,12 @@ class DBConnector:
     def connect(self):
         """ Opens an active connection to the database"""
         logging.info("Connecting to database {}@{} ...".format(self.conf["db_database"],self.conf["db_host"]))
-        #try:
-        self.__do_connect__()
-        return True
-        #except:
-        #   logging.error("Could not connect to database, please check credentials and retry ...")
-        #   return False
+        try:
+            self.__do_connect__()
+            return True
+        except:
+           logging.error("Could not connect to database, please check credentials and retry ...")
+           return False
 
     def disconnect(self):
         logging.debug("Disconnecting from database ...")
@@ -46,18 +46,6 @@ class DBConnector:
         command = "CREATE TABLE \"{}\" ({}, \"timestamp\" timestamp PRIMARY KEY);".format(table_name,column_names)
         return command
 
-
-    def create_table(self,station,header):
-        logging.info("Creating database {}".format(station))
-        self.cur = self.conn.cursor()
-        command = self.__build_create_command__(station,header)
-        try:
-            self.cur.execute(command)
-            self.conn.commit()
-            logging.info("creating table using: {} successful ...".format(command))
-        except pyodbc.DatabaseError as err:
-            logging.warning("creating table using: {} failed, rollback ...".format(command))
-
     def __build_insert_command__(self,table_name,row,header):
         keys = ""
         values = ""
@@ -75,7 +63,7 @@ class DBConnector:
             
             keys += " \"{}\"".format(header[k])
             if v is None:
-                values += " \'{}\'".format("NaN")
+                values += " \'{}\'".format(self.NULLVALUE)
             else:
                 values += " \'{}\'".format(v)
         timestamp = row['date'] + " " + row['time']
@@ -83,6 +71,19 @@ class DBConnector:
         values += ", \'{}\'".format(timestamp)
         command = "INSERT INTO \"{}\" ({}) VALUES ({});".format(table_name,keys,values)
         return command
+
+    def create_table(self,station,header):
+        self.cur = self.conn.cursor()
+        logging.info("Creating table {}".format(station))
+        command = self.__build_create_command__(table_name=station,header=header)
+        try:
+            self.cur.execute(command)
+            self.conn.commit()
+            logging.info("creating table using: {} successful ...".format(command))
+        except pyodbc.DatabaseError as err:
+            logging.warning("creating table using: {} failed ...".format(command))
+        except psycopg2.errors.DuplicateTable:
+            logging.warning("creating table using: {} already exists ...".format(command))
 
     def insert_data(self,station,dict_all):
         sucessful = 0
@@ -101,6 +102,7 @@ class DBConnector:
 
 
 class MSSQLConnector(DBConnector):
+    NULLVALUE = "null"
 
     def __do_connect__(self):
         self.conn = pyodbc.connect( DRIVER=self.conf["db_driver"],
@@ -112,7 +114,8 @@ class MSSQLConnector(DBConnector):
                                     autocommit=True)
 
 class PSQLConnector(DBConnector):
-    
+    NULLVALUE = "NaN"
+
     def __do_connect__(self):
         self.conn = onn = psycopg2.connect( host=self.conf["db_host"],
                                             database=self.conf["db_database"],
