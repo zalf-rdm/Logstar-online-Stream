@@ -3,21 +3,19 @@
 import argparse
 import requests
 
+import time
+from datetime import datetime, timedelta
 import logging
 import os
 import json
 import sys
-from src.postgres_connector import PSQL_DB
+from src.db_connector import MSSQLConnector,PSQLConnector 
 
 '''
 	API DOCs
 	http://dokuwiki.weather-station-data.com/doku.php?id=:en:start 
 '''
 LOGSTAR_API_URL = "https://logstar-online.de/api"
-
-# TODO help 
-def print_help():
-    raise NotImplementedError("This function is not yet implemented, please use look into code to the code :-( ...")
 
 
 def configure_logging(debug,filename=None):
@@ -51,14 +49,16 @@ def build_url(conf,station,channel):
 						)
 	return url
 
-#TODO handle timeout
 def request_data(url):
 	logging.debug("requesting {} ...".format(url))
-	r =requests.get(url)
+	try:
+		r = requests.get(url)
+	except:
+		return None
 	if r.status_code == 200:
 		return r.text
 	else:
-		logging.warning("Request error {}".format(r.status_code))
+		logging.debug("Request error {}".format(r.status_code))
 		return None
 
 def download_data(conf,station):
@@ -71,7 +71,7 @@ def download_data(conf,station):
 		dict_request = json.loads(request)
 		number_of_channels = len(dict_request["header"].keys()) - 2 # - time - date
 	except:
-		logging.warning("Could not calculate number of channels for station {}. Request may be broken ...".format(station))
+		logging.debug("Could not calculate number of channels for station {}. Request may be broken ...".format(station))
 		return None
 
 	channels=','.join(map(str,range(1,number_of_channels))) # who are you starting to count with 1
@@ -81,18 +81,29 @@ def download_data(conf,station):
 		return None
 	return json.loads(request)
 
+def manage_dl_db(conf,database):
+	for station in conf["stationlist"]:
+		logging.info("downloading data for station {} from {} to {} ...".format(station,conf["startdate"],conf["enddate"]))
+		dict_request = download_data(conf,station)
+		if dict_request is None:
+			continue
+		database.create_table(station,dict_request['header'])
+		database.insert_data(station,dict_request)
+
 def main():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-c",type=argparse.FileType('r', encoding='UTF-8'),help="pass config via config file, default via env")
+	parser.add_argument("-c","--config",type=argparse.FileType('r', encoding='UTF-8'),help="pass config via config file, default via env")
 	#parser.add_argument("-dry-run",type=argparse.FileType('r', encoding='UTF-8'),help="dry run downloads data but does not interact with database ...")
+	parser.add_argument("-o","--ongoing",action='store_true',help="activate continous downloading new released data on logstar-online for given stations")
+	parser.add_argument("-i","--interval",type=int,default=20,help="sampling interval in minutes")
 
 	# logging
-	parser.add_argument("-log",help="Redirect logs to a given file in addition to the console.",metavar='')
-	parser.add_argument("-v",action='store_true',help="Enable verbose logging")
+	parser.add_argument("-l","--log",help="Redirect logs to a given file in addition to the console.",metavar='')
+	parser.add_argument("-v","--verbose",action='store_true',help="Enable verbose logging")
 	args = parser.parse_args()
 
 	debug = False
-	if args.v:
+	if args.verbose:
 		debug = True
 
 	if args.log:
@@ -102,7 +113,7 @@ def main():
 		configure_logging(debug)
 		logging.debug("debug mode enabled")
 
-	if args.c:
+	if args.config:
 		conf = read_conf_from_file(args.c)
 	else:
 		logging.debug("reading configuration from OS environment ...")
@@ -113,16 +124,17 @@ def main():
 			"datetime": os.environ.get('LOGSTAR_DAYTIME',0),
 			"startdate": os.environ.get('LOGSTAR_STARTDATE',"2021-01-01"),
 			"enddate": os.environ.get('LOGSTAR_ENDDATE',"2021-05-02"),
-			"postgres_host": os.environ.get('LOGSTAR_POSTGRES_HOST','localhost'),
-			"postgres_database": os.environ.get('LOGSTAR_POSTGRES_DBNAME','logstar'),
-			"postgres_user": os.environ.get('LOGSTAR_POSTGRES_USER','postgres'),
-			"postgres_password": os.environ.get('LOGSTAR_POSTGRES_PASS','postgres')
-		}
+			"db_host": os.environ.get('LOGSTAR_DB_HOST','localhost'),
+			"db_database": os.environ.get('LOGSTAR_DB_DBNAME','logstar'),
+			"db_driver": os.environ.get('LOGSTAR_DB_DRIVER','PostgreSQL'),
+			"db_username": os.environ.get('LOGSTAR_DB_USER','postgres'),
+			"db_password": os.environ.get('LOGSTAR_DB_PASS','postgres'),
+			"db_port": os.environ.get('LOGSTAR_DB_PORT','5432')
 
+		}
 		logging.debug("loaded environment variables:")
 		for key,value in conf.items():
 			logging.debug("\t{} -> \"{}\"".format(key,value))	
-		
 		try:
 			station_list = conf["stations"].split(" ")
 			conf["stationlist"] = station_list
@@ -131,19 +143,35 @@ def main():
 			sys.exit(1)
 	
 	# test database connection
+	if conf["db_driver"] == "PostgreSQL":
+		database = PSQLConnector(conf)
+	else:
+		database = MSSQLConnector(conf)
 	
-	psql_conn = PSQL_DB(conf)
-	if not psql_conn.connect():
+	if not database.connect():
 		sys.exit(1)
 
-	for station in conf["stationlist"]:
-		logging.info("downloading data for station {} ...".format(station))
-		dict_request = download_data(conf,station)
-		if dict_request is None:
-			continue
-		psql_conn.create_table(station,dict_request['header'])
-		psql_conn.insert_data(station,dict_request)
-	psql_conn.disconnect()
+	if args.ongoing:
+		interval = int(args.interval) * 60
+		logging.info("Running in continous mode mit with interval set to: {} seconds ...".format(interval))
+		try:
+			while True:
+				today = datetime.today()
+				yesterday = today - timedelta(days=1)
+				tomorrow = today + timedelta(days=1)
+				now = datetime.now()
+				before = now - timedelta(seconds=(interval*2))
+				conf["startdate"] = today.strftime('%Y-%m-%d') # %H:%M:%S
+				conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
+				manage_dl_db(conf,database)
+				time.sleep(interval)
+		except KeyboardInterrupt:
+			logging.warning('interrupted, program is going to shutdown ...')
+	else:
+		manage_dl_db(conf, database)
+	
+	logging.info("Closing database connection ...")
+	database.disconnect()
 
 if __name__ == '__main__':
 	main()
