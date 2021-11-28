@@ -10,7 +10,6 @@ import os
 import json
 import sys
 from src.db_connector import MSSQLConnector,PSQLConnector 
-
 '''
 	API DOCs
 	http://dokuwiki.weather-station-data.com/doku.php?id=:en:start 
@@ -35,7 +34,6 @@ def read_conf_from_file(filename):
 
 ''' build url to request from '''
 def build_url(conf,station,channel):
-	station_name = "lacc01_182486a"
 	# docs: https://logstar-online.de/api/{apiKey}/{Stationname}/{StartTag}/{EndTag}/{Channellist}/{DateTime}/{GeoData} 
 	url = "{}/{}/{}/{}/{}/{}/{}/{}".format(
 							LOGSTAR_API_URL,
