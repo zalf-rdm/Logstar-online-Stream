@@ -1,5 +1,6 @@
 # manually
 load-config.sh
+mapping.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

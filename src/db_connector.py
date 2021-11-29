@@ -117,7 +117,7 @@ class PSQLConnector(DBConnector):
     NULLVALUE = "NaN"
 
     def __do_connect__(self):
-        self.conn = onn = psycopg2.connect( host=self.conf["db_host"],
+        self.conn = psycopg2.connect( host=self.conf["db_host"],
                                             database=self.conf["db_database"],
                                             user=self.conf["db_username"],
                                             password=self.conf["db_password"],

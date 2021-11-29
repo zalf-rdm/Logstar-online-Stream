@@ -10,7 +10,6 @@ import os
 import json
 import sys
 from src.db_connector import MSSQLConnector,PSQLConnector 
-
 '''
 	API DOCs
 	http://dokuwiki.weather-station-data.com/doku.php?id=:en:start 
@@ -35,7 +34,6 @@ def read_conf_from_file(filename):
 
 ''' build url to request from '''
 def build_url(conf,station,channel):
-	station_name = "lacc01_182486a"
 	# docs: https://logstar-online.de/api/{apiKey}/{Stationname}/{StartTag}/{EndTag}/{Channellist}/{DateTime}/{GeoData} 
 	url = "{}/{}/{}/{}/{}/{}/{}/{}".format(
 							LOGSTAR_API_URL,
@@ -48,6 +46,14 @@ def build_url(conf,station,channel):
 							conf["geodata"]
 						)
 	return url
+
+def do_mapping(station, mapping):
+	for key, value in mapping.items():
+		print(value["value"], station)
+		if value["value"] in station:
+			return key
+	logging.debug("Mapping for {} not found ...".format(station))
+	return station
 
 def request_data(url):
 	logging.debug("requesting {} ...".format(url))
@@ -81,14 +87,18 @@ def download_data(conf,station):
 		return None
 	return json.loads(request)
 
-def manage_dl_db(conf,database):
+def manage_dl_db(conf,database, mapping=None):
 	for station in conf["stationlist"]:
-		logging.info("downloading data for station {} from {} to {} ...".format(station,conf["startdate"],conf["enddate"]))
+		name = station
+		if mapping:
+			name = do_mapping(station, mapping)
+		logging.info("downloading data for station {} from {} to {} ...".format(name,conf["startdate"],conf["enddate"]))
 		dict_request = download_data(conf,station)
 		if dict_request is None:
 			continue
-		database.create_table(station,dict_request['header'])
-		database.insert_data(station,dict_request)
+
+		database.create_table(name,dict_request['header'])
+		database.insert_data(name,dict_request)
 
 def main():
 	parser = argparse.ArgumentParser()
@@ -96,6 +106,7 @@ def main():
 	#parser.add_argument("-dry-run",type=argparse.FileType('r', encoding='UTF-8'),help="dry run downloads data but does not interact with database ...")
 	parser.add_argument("-o","--ongoing",action='store_true',help="activate continous downloading new released data on logstar-online for given stations")
 	parser.add_argument("-i","--interval",type=int,default=20,help="sampling interval in minutes")
+	parser.add_argument("-m","--mapping-file", type=str,dest="mapping", help="path to json file for raw data to tablename mapping")
 
 	# logging
 	parser.add_argument("-l","--log",help="Redirect logs to a given file in addition to the console.",metavar='')
@@ -130,11 +141,18 @@ def main():
 			"db_username": os.environ.get('LOGSTAR_DB_USER','postgres'),
 			"db_password": os.environ.get('LOGSTAR_DB_PASS','postgres'),
 			"db_port": os.environ.get('LOGSTAR_DB_PORT','5432')
-
 		}
 		logging.debug("loaded environment variables:")
 		for key,value in conf.items():
-			logging.debug("\t{} -> \"{}\"".format(key,value))	
+			logging.debug("\t{} -> \"{}\"".format(key,value))
+		
+		mapping = None
+		if args.mapping:
+			if os.path.exists(args.mapping):
+				with open(args.mapping) as jsonfile:
+					mapping = json.load(jsonfile)
+				logging.debug("Found mapping json under: {} with following mapping:\n {}".format(args.mapping, mapping))
+
 		try:
 			station_list = conf["stations"].split(" ")
 			conf["stationlist"] = station_list
@@ -163,12 +181,12 @@ def main():
 				before = now - timedelta(seconds=(interval*2))
 				conf["startdate"] = today.strftime('%Y-%m-%d') # %H:%M:%S
 				conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
-				manage_dl_db(conf,database)
+				manage_dl_db(conf,database, mapping=mapping)
 				time.sleep(interval)
 		except KeyboardInterrupt:
 			logging.warning('interrupted, program is going to shutdown ...')
 	else:
-		manage_dl_db(conf, database)
+		manage_dl_db(conf, database, mapping=mapping)
 	
 	logging.info("Closing database connection ...")
 	database.disconnect()
