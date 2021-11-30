@@ -16,6 +16,7 @@ from src.db_connector import MSSQLConnector,PSQLConnector
 '''
 LOGSTAR_API_URL = "https://logstar-online.de/api"
 
+DB_RECONNECT_TIMEOUT = 3 # time in between reconnect attempts
 
 def configure_logging(debug,filename=None):
 	if filename is None:
@@ -29,8 +30,6 @@ def configure_logging(debug,filename=None):
 		else:
 			logging.basicConfig(filename=filename,format='%(asctime)s %(message)s', level=logging.INFO)
 
-def read_conf_from_file(filename):
-	raise NotImplementedError("This function is not yet implemented, please use environment variables to pass configuration values ...")
 
 ''' build url to request from '''
 def build_url(conf,station,channel):
@@ -51,6 +50,8 @@ def do_mapping(station, mapping):
 	for key, value in mapping.items():
 		print(value["value"], station)
 		if value["value"] in station:
+			if value["value"].endswith("BL"):
+				return key + "_BL"
 			return key
 	logging.debug("Mapping for {} not found ...".format(station))
 	return station
@@ -99,6 +100,7 @@ def manage_dl_db(conf,database, mapping=None):
 
 		database.create_table(name,dict_request['header'])
 		database.insert_data(name,dict_request)
+	return
 
 def main():
 	parser = argparse.ArgumentParser()
@@ -124,50 +126,53 @@ def main():
 		configure_logging(debug)
 		logging.debug("debug mode enabled")
 
-	if args.config:
-		conf = read_conf_from_file(args.c)
-	else:
-		logging.debug("reading configuration from OS environment ...")
-		conf = {
-			"apikey": os.environ.get('LOGSTAR_APIKEY'),
-			"stations":os.environ.get('LOGSTAR_STATIONS'),
-			"geodata": os.environ.get('LOGSTAR_GEODATA',True),
-			"datetime": os.environ.get('LOGSTAR_DAYTIME',0),
-			"startdate": os.environ.get('LOGSTAR_STARTDATE',"2021-01-01"),
-			"enddate": os.environ.get('LOGSTAR_ENDDATE',"2021-05-02"),
-			"db_host": os.environ.get('LOGSTAR_DB_HOST','localhost'),
-			"db_database": os.environ.get('LOGSTAR_DB_DBNAME','logstar'),
-			"db_driver": os.environ.get('LOGSTAR_DB_DRIVER','PostgreSQL'),
-			"db_username": os.environ.get('LOGSTAR_DB_USER','postgres'),
-			"db_password": os.environ.get('LOGSTAR_DB_PASS','postgres'),
-			"db_port": os.environ.get('LOGSTAR_DB_PORT','5432')
-		}
-		logging.debug("loaded environment variables:")
-		for key,value in conf.items():
-			logging.debug("\t{} -> \"{}\"".format(key,value))
-		
-		mapping = None
-		if args.mapping:
-			if os.path.exists(args.mapping):
-				with open(args.mapping) as jsonfile:
-					mapping = json.load(jsonfile)
-				logging.debug("Found mapping json under: {} with following mapping:\n {}".format(args.mapping, mapping))
+	logging.debug("reading configuration from OS environment ...")
+	conf = {
+		"apikey": os.environ.get('LOGSTAR_APIKEY'),
+		"stations":os.environ.get('LOGSTAR_STATIONS'),
+		"geodata": os.environ.get('LOGSTAR_GEODATA',True),
+		"datetime": os.environ.get('LOGSTAR_DAYTIME',0),
+		"startdate": os.environ.get('LOGSTAR_STARTDATE',"2021-01-01"),
+		"enddate": os.environ.get('LOGSTAR_ENDDATE',"2021-05-02"),
+		"db_host": os.environ.get('LOGSTAR_DB_HOST','localhost'),
+		"db_database": os.environ.get('LOGSTAR_DB_DBNAME','logstar'),
+		"db_driver": os.environ.get('LOGSTAR_DB_DRIVER','PostgreSQL'),
+		"db_username": os.environ.get('LOGSTAR_DB_USER','postgres'),
+		"db_password": os.environ.get('LOGSTAR_DB_PASS','postgres'),
+		"db_port": os.environ.get('LOGSTAR_DB_PORT','5432')
+	}
+	logging.debug("loaded environment variables:")
+	for key,value in conf.items():
+		logging.debug("\t{} -> \"{}\"".format(key,value))
 
-		try:
-			station_list = conf["stations"].split(" ")
-			conf["stationlist"] = station_list
-		except:
-			logging.error("Could not seperate stations bye bye...")
-			sys.exit(1)
-	
+	mapping = None
+	if args.mapping:
+		if os.path.exists(args.mapping):
+			with open(args.mapping) as jsonfile:
+				mapping = json.load(jsonfile)
+			logging.debug("Found mapping json under: {} with following mapping:\n {}".format(args.mapping, mapping))
+
+	try:
+		station_list = conf["stations"].split(" ")
+		conf["stationlist"] = station_list
+	except:
+		logging.error("Could not seperate stations bye bye...")
+		sys.exit(1)
+
 	# test database connection
 	if conf["db_driver"] == "PostgreSQL":
 		database = PSQLConnector(conf)
 	else:
 		database = MSSQLConnector(conf)
-	
-	if not database.connect():
-		sys.exit(1)
+
+	i = 0
+	while True:
+		if not database.connect():
+			logging.error("Could not connect to database, retry number {} ...".format(i))
+			i += 1
+			time.sleep(DB_RECONNECT_TIMEOUT)
+		else:
+			break
 
 	if args.ongoing:
 		interval = int(args.interval) * 60
@@ -175,10 +180,8 @@ def main():
 		try:
 			while True:
 				today = datetime.today()
-				yesterday = today - timedelta(days=1)
 				tomorrow = today + timedelta(days=1)
 				now = datetime.now()
-				before = now - timedelta(seconds=(interval*2))
 				conf["startdate"] = today.strftime('%Y-%m-%d') # %H:%M:%S
 				conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
 				manage_dl_db(conf,database, mapping=mapping)
@@ -187,7 +190,7 @@ def main():
 			logging.warning('interrupted, program is going to shutdown ...')
 	else:
 		manage_dl_db(conf, database, mapping=mapping)
-	
+
 	logging.info("Closing database connection ...")
 	database.disconnect()
 
