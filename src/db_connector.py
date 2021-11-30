@@ -1,7 +1,6 @@
 
 import pyodbc
 import logging
-import os
 import psycopg2
 
 class DBConnector:
@@ -16,7 +15,12 @@ class DBConnector:
 
     def connect(self):
         """ Opens an active connection to the database"""
-        logging.info("Connecting to database {}@{} ...".format(self.conf["db_database"],self.conf["db_host"]))
+
+        logging.info("Try to connect to database {}://{}@{}:{}/{}".format(self.conf["db_driver"],
+                                                                          self.conf["db_username"],
+                                                                          self.conf["db_host"],
+                                                                          self.conf["db_port"],
+                                                                          self.conf["db_database"]))
         try:
             self.__do_connect__()
             return True
