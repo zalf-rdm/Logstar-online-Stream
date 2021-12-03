@@ -221,7 +221,11 @@ def main():
 		except KeyboardInterrupt:
 			logging.warning('interrupted, program is going to shutdown ...')
 	else:
+<<<<<<< HEAD
 		manage_dl_db(conf, database, sensor_mapping=sensor_mapping)
+=======
+		manage_dl_db(conf, database, mapping=mapping)
+>>>>>>> 75374e7f515fb8481c4a90a5bb72806714dfe33e
 
 	logging.info("Closing database connection ...")
 	database.disconnect()
