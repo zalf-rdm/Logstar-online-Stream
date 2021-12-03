@@ -46,15 +46,46 @@ def build_url(conf,station,channel):
 						)
 	return url
 
-def do_mapping(station, mapping):
-	for key, value in mapping.items():
-		print(value["value"], station)
+def do_sensor_mapping(station, mapping):
+	for key, value in mapping['sensor-mapping'].items():
 		if value["value"] in station:
 			if value["value"].endswith("BL"):
 				return key + "_BL"
 			return key
-	logging.debug("Mapping for {} not found ...".format(station))
+	logging.debug("Mapping for sensor {} not found ...".format(station))
 	return station
+
+FIELDS_TO_IGNORE = ["date", "time"]
+
+def do_measurement_mapping(sensor_name, header, mapping):
+	import re
+	if sensor_name not in mapping["sensor-mapping"] or not mapping['sensor-mapping'][sensor_name]:
+		logging.info("could not provide measurement mapping for sensor {}, not found ...".format(sensor_name))
+		return header
+	measurement_class_name = mapping["sensor-mapping"][sensor_name]["measurement-class"]
+	measurement_class = mapping["measurement-classes"][measurement_class_name]
+	pattern = re.compile(measurement_class["regex"])
+	
+	new_header = {}
+	for k ,c_name_remote in header.items():
+		if c_name_remote in FIELDS_TO_IGNORE:
+			new_header[k] = c_name_remote
+			continue
+		for name, value in measurement_class["mapping"].items():
+			if value["abbreviation"] in c_name_remote:
+				if "only_includes_abbreviation" in value and value["only_includes_abbreviation"]:
+					c_name = "{} - {}".format(name, value["unit"])
+					new_header[k] = c_name
+
+					continue
+				r = pattern.match(c_name_remote)
+				c_name = "{}_{}_{}_cm_{}".format(name, 
+																						 measurement_class["position"][r["number"]]["side"], 
+																						 measurement_class["position"][r["number"]]["depth"], 
+																						 value["unit"]
+																						)
+				new_header[k] = c_name
+	return new_header
 
 def request_data(url):
 	logging.debug("requesting {} ...".format(url))
@@ -88,15 +119,16 @@ def download_data(conf,station):
 		return None
 	return json.loads(request)
 
-def manage_dl_db(conf,database, mapping=None):
+def manage_dl_db(conf, database, sensor_mapping=None):
 	for station in conf["stationlist"]:
 		name = station
-		if mapping:
-			name = do_mapping(station, mapping)
+		if sensor_mapping:
+			name = do_sensor_mapping(station, sensor_mapping)		
 		logging.info("downloading data for station {} from {} to {} ...".format(name,conf["startdate"],conf["enddate"]))
 		dict_request = download_data(conf,station)
 		if dict_request is None:
 			continue
+		dict_request['header'] = do_measurement_mapping(name, dict_request['header'], sensor_mapping)
 
 		database.create_table(name,dict_request['header'])
 		database.insert_data(name,dict_request)
@@ -108,7 +140,7 @@ def main():
 	#parser.add_argument("-dry-run",type=argparse.FileType('r', encoding='UTF-8'),help="dry run downloads data but does not interact with database ...")
 	parser.add_argument("-o","--ongoing",action='store_true',help="activate continous downloading new released data on logstar-online for given stations")
 	parser.add_argument("-i","--interval",type=int,default=20,help="sampling interval in minutes")
-	parser.add_argument("-m","--mapping-file", type=str,dest="mapping", help="path to json file for raw data to tablename mapping")
+	parser.add_argument("-m","--sensor_mapping_file", type=str,dest="sensor_mapping", help="path to json file for raw sensor name to tablename mapping")
 
 	# logging
 	parser.add_argument("-l","--log",help="Redirect logs to a given file in addition to the console.",metavar='')
@@ -145,12 +177,12 @@ def main():
 	for key,value in conf.items():
 		logging.debug("\t{} -> \"{}\"".format(key,value))
 
-	mapping = None
-	if args.mapping:
-		if os.path.exists(args.mapping):
-			with open(args.mapping) as jsonfile:
-				mapping = json.load(jsonfile)
-			logging.debug("Found mapping json under: {} with following mapping:\n {}".format(args.mapping, mapping))
+	sensor_mapping = None
+	if args.sensor_mapping:
+		if os.path.exists(args.sensor_mapping):
+			with open(args.sensor_mapping) as jsonfile:
+				sensor_mapping = json.load(jsonfile)
+			logging.info("Found sensor mapping json under: {} with following mapping:\n {}".format(args.sensor_mapping, sensor_mapping))
 
 	try:
 		station_list = conf["stations"].split(" ")
@@ -184,12 +216,16 @@ def main():
 				now = datetime.now()
 				conf["startdate"] = today.strftime('%Y-%m-%d') # %H:%M:%S
 				conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
-				manage_dl_db(conf,database, mapping=mapping)
+				manage_dl_db(conf,database, sensor_mapping=sensor_mapping)
 				time.sleep(interval)
 		except KeyboardInterrupt:
 			logging.warning('interrupted, program is going to shutdown ...')
 	else:
+<<<<<<< HEAD
+		manage_dl_db(conf, database, sensor_mapping=sensor_mapping)
+=======
 		manage_dl_db(conf, database, mapping=mapping)
+>>>>>>> 75374e7f515fb8481c4a90a5bb72806714dfe33e
 
 	logging.info("Closing database connection ...")
 	database.disconnect()
