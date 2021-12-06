@@ -49,8 +49,6 @@ def build_url(conf,station,channel):
 def do_sensor_mapping(station, mapping):
 	for key, value in mapping['sensor-mapping'].items():
 		if value["value"] in station:
-			if station.endswith("BL"):
-				return key + "_BL"
 			return key
 	logging.debug("Mapping for sensor {} not found ...".format(station))
 	return station
