@@ -49,7 +49,8 @@ def build_url(conf,station,channel):
 def do_sensor_mapping(station, mapping):
 	for key, value in mapping['sensor-mapping'].items():
 		if value["value"] in station:
-			if value["value"].endswith("BL"):
+			print(value["value"])
+			if station.endswith("BL"):
 				return key + "_BL"
 			return key
 	logging.debug("Mapping for sensor {} not found ...".format(station))
@@ -182,7 +183,7 @@ def main():
 		if os.path.exists(args.sensor_mapping):
 			with open(args.sensor_mapping) as jsonfile:
 				sensor_mapping = json.load(jsonfile)
-			logging.info("Found sensor mapping json under: {} with following mapping:\n {}".format(args.sensor_mapping, sensor_mapping))
+			logging.debug("Found sensor mapping json under: {} with following mapping:\n {}".format(args.sensor_mapping, sensor_mapping))
 
 	try:
 		station_list = conf["stations"].split(" ")
@@ -207,6 +208,7 @@ def main():
 			break
 
 	if args.ongoing:
+		print("BLA\nbla\nBLA")
 		interval = int(args.interval) * 60
 		logging.info("Running in continous mode mit with interval set to: {} seconds ...".format(interval))
 		try:

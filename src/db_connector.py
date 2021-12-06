@@ -23,11 +23,12 @@ class DBConnector:
                                                                           self.conf["db_database"]))
         try:
             self.__do_connect__()
+            logging.info("connected ...")
             return True
         except:
            logging.error("Could not connect to database, please check credentials and retry ...")
            return False
-
+        
     def disconnect(self):
         logging.debug("Disconnecting from database ...")
         if self.conn is not None:
@@ -54,7 +55,6 @@ class DBConnector:
         keys = ""
         values = ""
         first = True
-        header_list = list(header.keys())
         for k,v in row.items():
             if k == "date" or  k == "time":
                 continue
@@ -78,16 +78,19 @@ class DBConnector:
 
     def create_table(self,station,header):
         self.cur = self.conn.cursor()
-        logging.info("Creating table {}".format(station))
+        logging.info("Creating table {} ...".format(station))
         command = self.__build_create_command__(table_name=station,header=header)
         try:
             self.cur.execute(command)
             self.conn.commit()
-            logging.info("creating table using: {} successful ...".format(command))
+            logging.debug("creating table using: {} ...".format(command))
+            logging.info("successful ...")
         except pyodbc.DatabaseError as err:
-            logging.warning("creating table using: {} failed ...".format(command))
+            logging.debug("creating table using: {} ...".format(command))
+            logging.warning("failed ...")
         except psycopg2.errors.DuplicateTable:
-            logging.warning("creating table using: {} already exists ...".format(command))
+            logging.debug("creating table using: {} ...".format(command))
+            logging.warning("already exists ...")
 
     def insert_data(self,station,dict_all):
         sucessful = 0
