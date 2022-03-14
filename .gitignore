@@ -1,6 +1,8 @@
+
 # manually
+csv_out/
 load-config.sh
-sensor_
+sensor_*
 mapping.json
 
 # Byte-compiled / optimized / DLL files
