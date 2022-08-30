@@ -28,6 +28,9 @@ DB_RECONNECT_TIMEOUT = 3  # time in between reconnect attempts
 
 DEFAULT_DB_SCHEMA = "public"
 
+# env vars which must be set to run logstar stream
+REQUIRED_ENV_VARS = [ "LOGSTAR_APIKEY" , "LOGSTAR_STATIONS" ]
+
 
 def configure_logging(debug, filename=None):
     ''' define loglevel and log to file or to std '''
@@ -178,7 +181,8 @@ def manage_dl_db(conf, database_engine, processing_steps : List = [], sensor_map
             continue
         
         # rename table column names, or csv column names
-        data['header'] = do_column_name_mapping(name, data['header'], sensor_mapping)
+        if sensor_mapping is not None:
+            data['header'] = do_column_name_mapping(name, data['header'], sensor_mapping)
 
         # build pandas df from data
         df = pd.DataFrame(data['data'])
@@ -186,16 +190,17 @@ def manage_dl_db(conf, database_engine, processing_steps : List = [], sensor_map
 
         # give data to process
         output = pd.DataFrame()
-        ps_processor_generator = (ps.process(df, name) for ps in processing_steps)
-  
-        breakpoint()
+        [df := ps.process(df, name) for ps in processing_steps]
+        
+        #breakpoint()
 
-        table_name = db_table_prefix + name
-        logging.info("writing {} to database ...".format(table_name))
-        df.to_sql(table_name,
-                  con=database_engine,
-                  schema=db_schema,
-                  if_exists="append")
+        if database_engine:
+            table_name = db_table_prefix + name
+            logging.info("writing {} to database ...".format(table_name))    
+            df.to_sql(table_name,
+                    con=database_engine,
+                    schema=db_schema,
+                    if_exists="append")
 
         # write to file
         if csv_folder:
@@ -212,7 +217,7 @@ def manage_dl_db(conf, database_engine, processing_steps : List = [], sensor_map
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--ongoing", action='store_true',
+    parser.add_argument("-o", "--ongoing", dest="ongoing", action='store_true',
                         help="activate continous downloading new released data on logstar-online for given stations")
     parser.add_argument("-i", "--interval", type=int,
                         default=20, help="sampling interval in minutes")
@@ -225,7 +230,7 @@ def main():
 
     # plugins
     parser.add_argument('-ps', '--processing-step', dest="ps",
-                        nargs='+', action='append', help='adds a processingstep for ')
+                        nargs='+', action='append', help='adds a processingstep to work on downloaded data. This only applies if ongoing is not set')
 
     # db
     parser.add_argument("-nodb", "--disable_database", action='store_true', dest="disable_database",
@@ -254,6 +259,13 @@ def main():
         logging.debug("debug mode enabled")
 
     logging.debug("reading configuration from OS environment ...")
+
+
+    for re in REQUIRED_ENV_VARS:
+        if os.environ.get(re) is None:
+            logging.error(f"Required env var {re} is not set, bye ...")
+            sys.exit(1)
+
     conf = {
         "apikey": os.environ.get('LOGSTAR_APIKEY'),
         "stations": os.environ.get('LOGSTAR_STATIONS'),
@@ -309,7 +321,7 @@ def main():
     db_table_prefix = args.db_table_prefix if args.db_table_prefix is not None else ""
         
 
-    database = None
+    database_engine = None
     # skip database driver evaluation if -nodb set
     if not args.disable_database:
         # test database connection
@@ -360,13 +372,15 @@ def main():
         interval = int(args.interval) * 60
         logging.info(
             "Running in continous mode mit with interval set to: {} seconds ...".format(interval))
+        if processing_steps:
+            logging.warning(f"Processing Steps are set, but currently ignored in \"ongoing\" mode ...")
         try:
             while True:
                 today = datetime.today()
                 tomorrow = today + datetime.timedelta(days=1)
                 conf["startdate"] = today.strftime('%Y-%m-%d')  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
-                manage_dl_db(conf, database, sensor_mapping=sensor_mapping,
+                manage_dl_db(conf, database_engine, sensor_mapping=sensor_mapping,
                              db_schema=db_schema, db_table_prefix=db_table_prefix)
                 time.sleep(interval)
         except KeyboardInterrupt:
@@ -381,9 +395,9 @@ def main():
                       db_schema=db_schema,
                       db_table_prefix=db_table_prefix)
 
-    if database:
+    if database_engine:
         logging.info("Closing database connection ...")
-        database.disconnect()
+        database_engine.disconnect()
     logging.info("bye bye ...")
 
 

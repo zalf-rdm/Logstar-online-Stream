@@ -32,13 +32,15 @@ class JumpCheckPS(ProcessingStep):
       self.env = {}
 
     # remove jumps up 5 % for a single measurement
-    def process(self, df: pd.DataFrame, station: str, arguments: List):
-
+    def process(self, df: pd.DataFrame, station: str, argument: List=None):
+        print(f"parsing data for station {station}")
         station_env = EnvObject() if station not in self.env else self.env[station]
         for index, row in df.iterrows():
         
           # get through all defined measurements in JUMP_CHECK_MEASUREMENTS
           for column in self.JUMP_CHECK_COLUMN_NAMES:
+              if column not in row:
+                continue
               current_value = row[column]
 
               # check if current_value is nan
@@ -59,3 +61,5 @@ class JumpCheckPS(ProcessingStep):
               
               station_env.last_value = current_value
           self.env[station] = station_env
+        
+        return df
