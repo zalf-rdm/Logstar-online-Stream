@@ -45,3 +45,8 @@ Run programm in download mode. Downloads data in from startdate to enddate and s
 ```bash
 python logstar-receiver.py
 ```
+
+Example usage of processing step FilterColumnsPS with a number of columns to filter:
+```bash
+python logstar-receiver.py -m sensor_mapping.json -nodb -ps FilterColumnsPS columns="time date water_content_right_30_cm water_content_right_60_cm water_content_right_90_cm water_content_left_30_cm water_content_left_60_cm water_content_left_90_cm" -co data/
+```
