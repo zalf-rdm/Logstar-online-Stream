@@ -14,7 +14,7 @@ class FilterColumnsPS(ProcessingStep):
 
       usage like:
       
-      python logstar-receiver.py -m sensor_mapping.json -nodb -ps BulkConductivityDriftPS columns="time date bulk_conductivity_right_30cm"
+      python logstar-receiver.py -m sensor_mapping.json -nodb -ps FilterColumnsPS columns="time date bulk_conductivity_right_30cm"
       """
 
     def __init__(self, args: Dict):
@@ -22,7 +22,7 @@ class FilterColumnsPS(ProcessingStep):
 
     def process(self, df: pd.DataFrame, station: str):
         columns = self.args['columns'].split(" ")
-        logging.debug(f"runnging {self.ps_name} and only pass through following columns: {columns} ...")
+        logging.debug(f"running {self.ps_name} and only pass through following columns: {columns} ...")
         
         # check if all required fields are available
         all_requested_columns_available = set(columns).issubset(df.columns)
