@@ -29,7 +29,7 @@ DB_RECONNECT_TIMEOUT = 3  # time in between reconnect attempts
 DEFAULT_DB_SCHEMA = "public"
 
 # env vars which must be set to run logstar stream
-REQUIRED_ENV_VARS = [ "LOGSTAR_APIKEY" , "LOGSTAR_STATIONS" ]
+REQUIRED_ENV_VARS = ["LOGSTAR_APIKEY", "LOGSTAR_STATIONS"]
 
 
 def configure_logging(debug, filename=None):
@@ -139,7 +139,7 @@ def download_data(conf, station):
         number_of_channels = len(
             dict_request["header"].keys()) - 1  # - time - date
     except:
-        logging.debug(
+        logging.error(
             "Could not calculate number of channels for station {}. Request may be broken ...".format(station))
         return None
 
@@ -152,9 +152,8 @@ def download_data(conf, station):
         return None
     return json.loads(request)
 
-#ProcessingStepList = list(ps.ProcessingStep)
 
-def manage_dl_db(conf, database_engine, processing_steps : List = [], sensor_mapping=None, csv_folder=None, db_schema=None, db_table_prefix=None):
+def manage_dl_db(conf, database_engine, processing_steps: List = [], sensor_mapping=None, csv_folder=None, db_schema=None, db_table_prefix=None):
     """ 
     main routine to download data and save it to database and|or csv
 
@@ -179,39 +178,41 @@ def manage_dl_db(conf, database_engine, processing_steps : List = [], sensor_map
         if data is None:
             # no new data or something went wrong while downloading the data
             continue
-        
+
         # rename table column names, or csv column names
         if sensor_mapping is not None:
             data['header'] = do_column_name_mapping(name, data['header'], sensor_mapping)
 
         # build pandas df from data
         df = pd.DataFrame(data['data'])
-        df.rename(columns=data['header'])
+        df = df.rename(columns=data['header'])
 
         # give data to process
-        output = pd.DataFrame()
-        [df := ps.process(df, name) for ps in processing_steps]
-        
-        #breakpoint()
+        if processing_steps is not None:
+            [df := ps.process(df, name) for ps in processing_steps]
+
+        if df.empty:
+            continue
 
         if database_engine:
             table_name = db_table_prefix + name
-            logging.info("writing {} to database ...".format(table_name))    
+            logging.info("writing {} to database ...".format(table_name))
             df.to_sql(table_name,
-                    con=database_engine,
-                    schema=db_schema,
-                    if_exists="append")
+                      con=database_engine,
+                      schema=db_schema,
+                      if_exists="append")
 
         # write to file
         if csv_folder:
-            filepath = os.path.join(csv_folder, name, ".csv")
+            filepath = os.path.join(csv_folder, name + ".csv")
             df.to_csv(filepath,
                       sep=',',
                       quotechar='"',
                       header=True,
                       doublequote=False,
-                      quoting=csv.QUOTE_MINIMAL
-            )
+                      quoting=csv.QUOTE_MINIMAL,
+                      index=False
+                      )
     return
 
 
@@ -237,7 +238,7 @@ def main():
                         default=False, help="with -nodb set, results in no interaction with the database")
     parser.add_argument("-dbtp", "--db_table_prefix", dest="db_table_prefix",
                         type=str, required=False, help="Prefix set for tables in Database")
-    parser.add_argument("-dbs", "--db_schema", dest="db_schema", default = DEFAULT_DB_SCHEMA,
+    parser.add_argument("-dbs", "--db_schema", dest="db_schema", default=DEFAULT_DB_SCHEMA,
                         required=False, type=str, help="Database schema")
 
     # logging
@@ -259,7 +260,6 @@ def main():
         logging.debug("debug mode enabled")
 
     logging.debug("reading configuration from OS environment ...")
-
 
     for re in REQUIRED_ENV_VARS:
         if os.environ.get(re) is None:
@@ -290,8 +290,7 @@ def main():
         if os.path.exists(args.sensor_mapping):
             with open(args.sensor_mapping) as jsonfile:
                 sensor_mapping = json.load(jsonfile)
-            logging.debug("Found sensor mapping json under: {} with following mapping:\n {}".format(
-                args.sensor_mapping, sensor_mapping))
+            logging.debug(f"Found sensor mapping json under: {args.sensor_mapping}")
 
     # splits station names from conf given as space seperated string to list
     try:
@@ -309,46 +308,45 @@ def main():
             sys.exit(1)
         logging.info("found csv folder: %s ..." % args.csv_outfolder)
 
-
+    processing_steps = None
     # check and init processing steps
     if args.ps:
-      processing_steps = [ps.load_class(ps_step_and_args) for ps_step_and_args in args.ps]
+        processing_steps = [ps.load_class(ps_step_and_args) for ps_step_and_args in args.ps]
 
     # set db schema
     db_schema = args.db_schema
 
     # set db table prefix
     db_table_prefix = args.db_table_prefix if args.db_table_prefix is not None else ""
-        
 
     database_engine = None
     # skip database driver evaluation if -nodb set
     if not args.disable_database:
         # test database connection
         if conf["db_driver"] == "PostgreSQL":
-          connection_url = URL.create(
-              "postgresql",
-              username=conf["db_username"],
-              password=conf["db_password"],
-              host=conf["db_host"],
-              port=conf["db_port"],
-              database=conf["db_database"],
-          )
-          database_engine = create_engine(connection_url)
+            connection_url = URL.create(
+                "postgresql",
+                username=conf["db_username"],
+                password=conf["db_password"],
+                host=conf["db_host"],
+                port=conf["db_port"],
+                database=conf["db_database"],
+            )
+            database_engine = create_engine(connection_url)
 
         elif conf["db_driver"] == "ODBC Driver 17 for SQL Server":
-          connection_url = URL.create(
-              "mssql+pyodbc",
-              username=conf["db_username"],
-              password=conf["db_password"],
-              host=conf["db_host"],
-              port=conf["db_port"],
-              database=conf["db_database"],
-              query={
-                  "driver": conf["db_driver"],
-                  "authentication": "ActiveDirectoryIntegrated",
-              },
-          )
+            connection_url = URL.create(
+                "mssql+pyodbc",
+                username=conf["db_username"],
+                password=conf["db_password"],
+                host=conf["db_host"],
+                port=conf["db_port"],
+                database=conf["db_database"],
+                query={
+                    "driver": conf["db_driver"],
+                    "authentication": "ActiveDirectoryIntegrated",
+                },
+            )
 
         else:
             logging.error("provided \"db_driver\": \"{}\"  unknown, logstar only supports \"PostgreSQL\" and \"ODBC Driver 17 for SQL Server\"...".format(
@@ -360,8 +358,7 @@ def main():
         while True:
             database_engine = create_engine(connection_url)
             if not database_engine:
-                logging.error(
-                    "Could not connect to database, retry number {} ...".format(i))
+                logging.error("Could not connect to database, retry number {} ...".format(i))
                 i += 1
                 time.sleep(DB_RECONNECT_TIMEOUT)
             else:
@@ -370,8 +367,7 @@ def main():
     # if ongoing is set logstar constantly looks for new data
     if args.ongoing:
         interval = int(args.interval) * 60
-        logging.info(
-            "Running in continous mode mit with interval set to: {} seconds ...".format(interval))
+        logging.info("Running in continous mode mit with interval set to: {} seconds ...".format(interval))
         if processing_steps:
             logging.warning(f"Processing Steps are set, but currently ignored in \"ongoing\" mode ...")
         try:
@@ -380,20 +376,19 @@ def main():
                 tomorrow = today + datetime.timedelta(days=1)
                 conf["startdate"] = today.strftime('%Y-%m-%d')  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
-                manage_dl_db(conf, database_engine, sensor_mapping=sensor_mapping,
-                             db_schema=db_schema, db_table_prefix=db_table_prefix)
+                manage_dl_db(conf, database_engine, sensor_mapping=sensor_mapping, db_schema=db_schema, db_table_prefix=db_table_prefix)
                 time.sleep(interval)
         except KeyboardInterrupt:
             logging.warning('interrupted, program is going to shutdown ...')
     else:
         # download data fro with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
-        manage_dl_db( conf,
-                      database_engine,
-                      processing_steps=processing_steps,
-                      sensor_mapping=sensor_mapping,
-                      csv_folder=args.csv_outfolder,
-                      db_schema=db_schema,
-                      db_table_prefix=db_table_prefix)
+        manage_dl_db(conf,
+                     database_engine,
+                     processing_steps=processing_steps,
+                     sensor_mapping=sensor_mapping,
+                     csv_folder=args.csv_outfolder,
+                     db_schema=db_schema,
+                     db_table_prefix=db_table_prefix)
 
     if database_engine:
         logging.info("Closing database connection ...")
