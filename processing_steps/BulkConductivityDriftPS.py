@@ -65,7 +65,10 @@ class BulkConductivityDriftPS(ProcessingStep):
         all_requested_columns_available = set(self.ELEMENT_ORDER_LEFT + self.ELEMENT_ORDER_RIGHT).issubset(df.columns)
         if not all_requested_columns_available:
             logging.debug(f"did not found all required columns in {station} to run {self.ps_name}")
-            return
+            return df
+
+        if df is None:
+              return None
 
         for row_num, row in df.iterrows():
 

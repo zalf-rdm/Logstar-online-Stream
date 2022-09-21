@@ -74,6 +74,7 @@ class ProcessingStep(object):
         }
         self.changed.append(changed_object)
         df.at[row_num, column_name] = self.ERROR_VALUE
+        return df
 
     def write_log(self,station):
       """

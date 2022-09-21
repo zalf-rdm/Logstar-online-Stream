@@ -191,7 +191,7 @@ def manage_dl_db(conf, database_engine, processing_steps: List = [], sensor_mapp
         if processing_steps is not None:
             [df := ps.process(df, name) for ps in processing_steps]
 
-        if df.empty:
+        if df is None or df.empty:
             continue
 
         if database_engine:
