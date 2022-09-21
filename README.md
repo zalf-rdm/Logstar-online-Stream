@@ -50,3 +50,5 @@ Example usage of processing step FilterColumnsPS with a number of columns to fil
 ```bash
 python logstar-receiver.py -m sensor_mapping.json -nodb -ps FilterColumnsPS columns="time date water_content_right_30_cm water_content_right_60_cm water_content_right_90_cm water_content_left_30_cm water_content_left_60_cm water_content_left_90_cm" -co data/
 ```
+
+To find out more about processing steps lookup the additional [docs](./docs/processings_steps.md). 
