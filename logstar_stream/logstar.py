@@ -132,6 +132,7 @@ def manage_dl_db(conf, database_engine=None, processing_steps: List = [], sensor
     :param db_schema
     :param db_table_prefix
     """
+    ret_data = {}
     for station in conf["stationlist"]:
         name = station
         # rename station if sensor_mapping available
@@ -180,4 +181,5 @@ def manage_dl_db(conf, database_engine=None, processing_steps: List = [], sensor
                       quoting=csv.QUOTE_MINIMAL,
                       index=False
                       )
-    return df
+        ret_data["station"] = df
+    return ret_data
