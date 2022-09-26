@@ -181,5 +181,5 @@ def manage_dl_db(conf, database_engine=None, processing_steps: List = [], sensor
                       quoting=csv.QUOTE_MINIMAL,
                       index=False
                       )
-        ret_data[station] = df
+        ret_data[name] = df
     return ret_data
