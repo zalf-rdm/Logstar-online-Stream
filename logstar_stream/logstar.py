@@ -120,7 +120,7 @@ def download_data(conf, station):
     return json.loads(request)
 
 
-def manage_dl_db(conf, database_engine, processing_steps: List = [], sensor_mapping=None, csv_folder=None, db_schema=None, db_table_prefix=None):
+def manage_dl_db(conf, database_engine=None, processing_steps: List = [], sensor_mapping=None, csv_folder=None, db_schema=None, db_table_prefix=None):
     """ 
     main routine to download data and save it to database and|or csv
 
@@ -180,4 +180,4 @@ def manage_dl_db(conf, database_engine, processing_steps: List = [], sensor_mapp
                       quoting=csv.QUOTE_MINIMAL,
                       index=False
                       )
-    return
+    return df

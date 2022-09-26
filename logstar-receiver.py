@@ -11,6 +11,7 @@ import time
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 
+import logstar_stream.logstar as logstar
 import logstar_stream.processing_steps.ProcessingStep as ps
 
 DB_RECONNECT_TIMEOUT = 3  # time in between reconnect attempts
@@ -199,13 +200,13 @@ def main():
                 tomorrow = today + datetime.timedelta(days=1)
                 conf["startdate"] = today.strftime('%Y-%m-%d')  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime('%Y-%m-%d')
-                manage_dl_db(conf, database_engine, sensor_mapping=sensor_mapping, db_schema=db_schema, db_table_prefix=db_table_prefix)
+                logstar.manage_dl_db(conf, database_engine, sensor_mapping=sensor_mapping, db_schema=db_schema, db_table_prefix=db_table_prefix)
                 time.sleep(interval)
         except KeyboardInterrupt:
             logging.warning('interrupted, program is going to shutdown ...')
     else:
         # download data fro with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
-        manage_dl_db(conf,
+        logstar.manage_dl_db(conf,
                      database_engine,
                      processing_steps=processing_steps,
                      sensor_mapping=sensor_mapping,
