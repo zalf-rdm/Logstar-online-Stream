@@ -9,5 +9,10 @@ setup(name='logstar-receiver',
         author='marcel wallschlaeger',
         author_email='marcel.wallschlaeger@zalf.de',
         zip_safe = False,
-        packages=['src','processing_steps'],
+        packages=['logstar_stream','logstar_stream.processing_steps'],
+        install_requires=[
+          'requests',
+          'sqlalchemy',
+          'pandas'
+        ]
       )
