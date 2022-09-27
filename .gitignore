@@ -1,4 +1,7 @@
 
+# individual
+data/
+
 # manually
 csv_out/
 load-config.sh
@@ -134,3 +137,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.vscode
