@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="logstar-receiver",
-    version="1.0",
+    version="1.1",
     description="supporting library for bonares/zalf repository",
     url="https://github.com/zalf-rdm/Logstar-online-Stream/",
     author="marcel wallschlaeger",
