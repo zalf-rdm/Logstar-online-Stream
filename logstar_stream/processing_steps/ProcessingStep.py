@@ -1,8 +1,7 @@
-
 import sys
 import os
 import importlib
-from typing import List, Dict
+from typing import Dict
 import logging
 
 import pandas as pd
@@ -17,7 +16,7 @@ def load_class(p):
     """
     createing a processing step object of a string like: "PSNAME arg1=value1 arg2=value2"
     checks if the PSNAME is a class name in processing_steps folder.
-    The class name must have the same name as the file in the ProcessingStep folder 
+    The class name must have the same name as the file in the ProcessingStep folder
 
     param: p creation string
 
@@ -32,21 +31,22 @@ def load_class(p):
             args[k] = v
         else:
             logging.error(
-                "Processing step args require an assignment operator(=). Like key=value ...")
+                "Processing step args require an assignment operator(=). Like key=value ..."
+            )
             sys.exit(1)
 
     module = PS_MOD_DIR + class_name
-    logging.info(
-        f"loading {class_name} with args {args} as module: {module} ...")
+    logging.info(f"loading {class_name} with args {args} as module: {module} ...")
     m = importlib.import_module(module)
     c = eval("m.{}".format(class_name))
     return c(args=args)
 
 
 class ProcessingStep(object):
-
     ps_name = "AbstractLogstarOnlineStreamProcessingStep"
-    ps_description = "Abstract Processing Step description, please overwrite when inheriting"
+    ps_description = (
+        "Abstract Processing Step description, please overwrite when inheriting"
+    )
     changed = []
 
     def __init__(self, args: Dict):
@@ -56,7 +56,7 @@ class ProcessingStep(object):
         self.args = args
 
     def process(self, df: pd.DataFrame, station: str) -> pd.DataFrame:
-        """ processes data and may manipulates it """
+        """processes data and may manipulates it"""
         raise NotImplementedError
 
     def __do_change__(self, df, row_num, column_name):
@@ -69,13 +69,14 @@ class ProcessingStep(object):
         """
         row = df.iloc[row_num]
         logging.debug(
-            f"{self.ps_name} | {column_name} {row['date']} {row['time']}: {row[column_name]} -> {self.ERROR_VALUE}")
+            f"{self.ps_name} | {column_name} {row['date']} {row['time']}: {row[column_name]} -> {self.ERROR_VALUE}"
+        )
         changed_object = {
             "messurement": column_name,
-            "date": row['date'],
-            "time": row['time'],
+            "date": row["date"],
+            "time": row["time"],
             "old_value": df.at[row_num, column_name],
-            "new_value": self.ERROR_VALUE
+            "new_value": self.ERROR_VALUE,
         }
         self.changed.append(changed_object)
         df.at[row_num, column_name] = self.ERROR_VALUE
@@ -99,7 +100,8 @@ class ProcessingStep(object):
 
         if not os.path.exists(PS_LOGGING_DIR):
             logging.warning(
-                f"processing step logging folder: {PS_LOGGING_DIR} does not exist, skip logging for {self.ps_name} ...")
+                f"processing step logging folder: {PS_LOGGING_DIR} does not exist, skip logging for {self.ps_name} ..."
+            )
             return
 
         if not self.changed:
@@ -107,7 +109,12 @@ class ProcessingStep(object):
 
         log_filename = self.ps_name + "_" + station + ".log"
         with open(os.path.join(PS_LOGGING_DIR, log_filename), "a+") as f:
-            [f.write(f"{d['date']} {d['time']} | {station} -- {d['messurement']}: changed from {d['old_value']} -> {d['new_value']}\n")
-             for d in self.changed]
+            [
+                f.write(
+                    f"{d['date']} {d['time']} | {station} -- {d['messurement']}: changed from {d['old_value']} -> {d['new_value']}\n"
+                )
+                for d in self.changed
+            ]
         logging.debug(
-            f"finished writing {len(self.changed)} entries into changelog for {log_filename} ...")
+            f"finished writing {len(self.changed)} entries into changelog for {log_filename} ..."
+        )

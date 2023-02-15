@@ -1,4 +1,3 @@
-
 import argparse
 import os
 import importlib
@@ -9,7 +8,8 @@ IGNORE_IN_PATH = ["__init__.py", "__pycache__"]
 
 
 def main():
-    parser = argparse.ArgumentParser(description='''
+    parser = argparse.ArgumentParser(
+        description="""
     Manager to show available processing steps in LogstarOnlineStream 
     
     Processing steps can be used to manipulate data after it got downloaded with logstar-online-stream. So the data on 
@@ -17,10 +17,16 @@ def main():
     and so on.
 
     Processing steps have to be placed inside {PLUGINS_DIR} directory and must inherit from LogstarOnlineStreamProcessingStep in processing_step.py
-    '''
-                                     )
-    parser.add_argument("-l", "--list", required=False, dest="list", action='store_true',
-                        help="list available plugins in plugins dir")
+    """
+    )
+    parser.add_argument(
+        "-l",
+        "--list",
+        required=False,
+        dest="list",
+        action="store_true",
+        help="list available plugins in plugins dir",
+    )
     args = parser.parse_args()
     if args.list:
         plugins = os.listdir(plg.PS_DIR)
@@ -40,5 +46,5 @@ def main():
                 print("Class: {} not valid ...".format(c.ps_name))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
