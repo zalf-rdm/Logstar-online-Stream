@@ -4,7 +4,7 @@ import logging
 
 import pandas as pd
 
-from processing_steps.ProcessingStep import ProcessingStep
+from logstar_stream.processing_steps.ProcessingStep import ProcessingStep
 
 
 class EnvObject:
