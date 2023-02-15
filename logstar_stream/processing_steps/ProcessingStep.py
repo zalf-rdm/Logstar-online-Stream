@@ -7,7 +7,7 @@ import logging
 
 import pandas as pd
 
-PS_DIR = "processing_steps/"
+PS_DIR = "logstar_stream/processing_steps/"
 PS_MOD_DIR = PS_DIR.replace("/", ".")
 
 PS_LOGGING_DIR = "logs/"
@@ -55,9 +55,9 @@ class ProcessingStep(object):
         self.changed = []
         self.args = args
 
-    def process(self, df: pd.DataFrame, station: str):
+    def process(self, df: pd.DataFrame, station: str) -> pd.DataFrame:
         """ processes data and may manipulates it """
-        pass
+        raise NotImplementedError
 
     def __do_change__(self, df, row_num, column_name):
         """

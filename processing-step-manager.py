@@ -3,7 +3,7 @@ import argparse
 import os
 import importlib
 
-import processing_steps.ProcessingStep as plg
+import logstar_stream.processing_steps.ProcessingStep as plg
 
 IGNORE_IN_PATH = ["__init__.py", "__pycache__"]
 
