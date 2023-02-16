@@ -16,11 +16,11 @@ class FilterColumnsPS(ProcessingStep):
       python logstar-receiver.py -m sensor_mapping.json -nodb -ps FilterColumnsPS columns="time date bulk_conductivity_right_30cm"
       """
 
-    def __init__(self, args: Dict):
-        super().__init__(args)
+    def __init__(self, kwargs):
+        super().__init__(kwargs)
 
     def process(self, df: pd.DataFrame, station: str):
-        columns = self.args["columns"].split(" ")
+        columns = self.kwargs["columns"].split(" ")
         logging.debug(
             f"running {self.ps_name} and only pass through following columns: {columns} ..."
         )

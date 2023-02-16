@@ -22,8 +22,8 @@ class WeatherStationPrecipitationPS(ProcessingStep):
     # apply to value
     COLUMN_NAME = "precipitation_surface_-200_cm"
 
-    def __init__(self, args: Dict):
-        super().__init__(args)
+    def __init__(self, kwargs):
+        super().__init__(kwargs)
 
     def process(self, df: pd.DataFrame, station: str, argument: List = None):
         if station not in self.ALLOWED_STATIONS:

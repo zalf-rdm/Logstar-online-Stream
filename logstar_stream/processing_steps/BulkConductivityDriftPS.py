@@ -18,7 +18,7 @@ class BulkConductivityDriftPS(ProcessingStep):
 
     FORBIDDEN_VALUES = [{"value": 0, "duration": 100}]
 
-    MAX_DIFF = 50
+    threshold = 50
 
     ELEMENT_ORDER_LEFT = [
         "bulk_conductivity_left_30_cm",
@@ -31,14 +31,15 @@ class BulkConductivityDriftPS(ProcessingStep):
         "bulk_conductivity_right_90_cm",
     ]
 
-    def __init__(self, args: Dict):
-        super().__init__(args)
+    def __init__(self, kwargs):
+        super().__init__(kwargs)
+        self.threshold = float(kwargs['threshold']) if "threshold" in kwargs else self.threshold
         self.to_change = []
 
     def __check_wc_for_drift__(self, l):
-        if self.ELEMENT_ORDER_LEFT[0] - self.ELEMENT_ORDER_LEFT[1] >= self.MAX_DIFF:
+        if self.ELEMENT_ORDER_LEFT[0] - self.ELEMENT_ORDER_LEFT[1] >= self.threshold:
             pass
-        elif self.ELEMENT_ORDER_LEFT[1] - self.ELEMENT_ORDER_LEFT[2] >= self.MAX_DIFF:
+        elif self.ELEMENT_ORDER_LEFT[1] - self.ELEMENT_ORDER_LEFT[2] >= self.threshold:
             pass
 
     def compare_and_prepare_to_change(self, column_lr, row_num, row, i):
@@ -49,7 +50,7 @@ class BulkConductivityDriftPS(ProcessingStep):
         if None in (value, value_1, value_2) or math.isnan(value):
             return
 
-        if value - value_1 > self.MAX_DIFF and value - value_2 > self.MAX_DIFF:
+        if value - value_1 > self.threshold and value - value_2 > self.threshold:
             self.to_change.append((int(row_num), column_lr[i]))
 
     def process(self, df: pd.DataFrame, station: str):

@@ -51,8 +51,8 @@ class JumpCheckPS(ProcessingStep):
     # jump difference between two following values
     MINIMUM_JUMP_DIFFER_VALUE = 5
 
-    def __init__(self, args: Dict):
-        super().__init__(args)
+    def __init__(self, kwargs):
+        super().__init__(kwargs)
         self.env = {}
 
     def change_values(self, df, station_messurement_env):

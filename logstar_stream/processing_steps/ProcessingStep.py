@@ -39,7 +39,7 @@ def load_class(p):
     logging.info(f"loading {class_name} with args {args} as module: {module} ...")
     m = importlib.import_module(module)
     c = eval("m.{}".format(class_name))
-    return c(args=args)
+    return c(kwargs=args)
 
 
 class ProcessingStep(object):
@@ -49,11 +49,11 @@ class ProcessingStep(object):
     )
     changed = []
 
-    def __init__(self, args: Dict):
-        if "PS_LOGGING_DIR" in args:
-            self.PS_LOGGING_DIR = args["PS_LOGGING_DIR"]
+    def __init__(self, kwargs):
+        if "PS_LOGGING_DIR" in kwargs:
+            self.PS_LOGGING_DIR = kwargs["PS_LOGGING_DIR"]
         self.changed = []
-        self.args = args
+        self.args = kwargs
 
     def process(self, df: pd.DataFrame, station: str) -> pd.DataFrame:
         """processes data and may manipulates it"""
