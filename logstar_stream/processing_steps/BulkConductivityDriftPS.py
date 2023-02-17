@@ -42,29 +42,19 @@ class BulkConductivityDriftPS(ProcessingStep):
         elif self.ELEMENT_ORDER_LEFT[1] - self.ELEMENT_ORDER_LEFT[2] >= self.threshold:
             pass
 
-    def compare_and_prepare_to_change(self, column_lr, row_num, row, i):
-        value = row[column_lr[i]]
-        value_1 = row[column_lr[(i + 1) % len(column_lr)]]
-        value_2 = row[column_lr[(i + 2) % len(column_lr)]]
-
-        if None in (value, value_1, value_2) or math.isnan(value):
+    def compare_and_prepare_to_change(self, column_identifier_left, column_identifier_right, row_num, row):
+        left_value = row[column_identifier_left]
+        right_value = row[column_identifier_right]
+        
+        if None in (left_value, right_value) or math.isnan(left_value) or math.isnan(right_value):
             return
 
-        if value - value_1 > self.threshold or value - value_2 > self.threshold:
-            print(value,value_1,value_2, ":", row[column_lr[i]])
-            self.to_change.append((int(row_num), column_lr[i]))
+        if left_value - right_value > self.threshold:
+            self.to_change.append((int(row_num), column_identifier_left))
 
-    # original function
-    def compare_and_prepare_to_change_orig(self, column_lr, row_num, row, i):
-        value = row[column_lr[i]]
-        value_1 = row[column_lr[(i + 1) % len(column_lr)]]
-        value_2 = row[column_lr[(i + 2) % len(column_lr)]]
+        elif right_value - left_value > self.threshold:
+            self.to_change.append((int(row_num), column_identifier_right))
 
-        if None in (value, value_1, value_2) or math.isnan(value):
-            return
-
-        if value - value_1 > self.threshold and value - value_2 > self.threshold:
-            self.to_change.append((int(row_num), column_lr[i]))
 
     def process(self, df: pd.DataFrame, station: str):
         logging.debug(f"parsing data for station {station} ...")
@@ -83,14 +73,16 @@ class BulkConductivityDriftPS(ProcessingStep):
             return None
 
         for row_num, row in df.iterrows():
-            # iter over left and right
-            for column_lr in [self.ELEMENT_ORDER_LEFT, self.ELEMENT_ORDER_RIGHT]:
-                # iter through each entry of ELEMENT_ORDER_RIGHT | ELEMENT_ORDER_LEFT and compare each entry with the
-                # other two to check if one of them is threshold units above the others, if so add them to to_change list
-                [
-                    self.compare_and_prepare_to_change(column_lr, row_num, row, i)
-                    for i in range(len(column_lr))
-                ]
+          [self.compare_and_prepare_to_change(self.ELEMENT_ORDER_LEFT[i], self.ELEMENT_ORDER_RIGHT[i],row_num, row) for i in range(3)]
+
+        #     # iter over left and right
+        #     for column_lr in [self.ELEMENT_ORDER_LEFT, self.ELEMENT_ORDER_RIGHT]:
+        #         # iter through each entry of ELEMENT_ORDER_RIGHT | ELEMENT_ORDER_LEFT and compare each entry with the
+        #         # other two to check if one of them is threshold units above the others, if so add them to to_change list
+        #         [
+        #             self.compare_and_prepare_to_change(column_lr, row_num, row, i)
+        #             for i in range(len(column_lr))
+        #         ]
 
         # run do change for all to change values
         [

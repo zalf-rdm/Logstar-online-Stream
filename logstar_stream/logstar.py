@@ -174,9 +174,12 @@ def manage_dl_db(
             data["header"] = do_column_name_mapping(
                 name, data["header"], sensor_mapping
             )
-
         # build pandas df from data
         df = pd.DataFrame(data["data"])
+        # making date and time occure in beginning
+        cols = df.columns.tolist()
+        cols = cols[-2:] + cols[:-2]
+        df = df[cols]
         df = df.rename(columns=data["header"])
 
         # give data to process
