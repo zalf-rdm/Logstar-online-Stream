@@ -18,7 +18,8 @@ class BulkConductivityDriftPS(ProcessingStep):
 
     FORBIDDEN_VALUES = [{"value": 0, "duration": 100}]
 
-    threshold = 50
+    treshold_left_to_right = 50
+    threshold_between_depth = 60
 
     ELEMENT_ORDER_LEFT = [
         "bulk_conductivity_left_30_cm",
@@ -33,28 +34,46 @@ class BulkConductivityDriftPS(ProcessingStep):
 
     def __init__(self, kwargs):
         super().__init__(kwargs)
-        self.threshold = float(kwargs['threshold']) if "threshold" in kwargs else self.threshold
+        self.treshold_left_to_right = float(kwargs['treshold_left_to_right']) if "treshold_left_to_right" in kwargs else self.treshold_left_to_right
+        self.threshold_between_depth = float(kwargs['threshold_between_depth']) if "threshold_between_depth" in kwargs else self.threshold_between_depth
+
         self.to_change = []
 
-    def __check_wc_for_drift__(self, l):
-        if self.ELEMENT_ORDER_LEFT[0] - self.ELEMENT_ORDER_LEFT[1] >= self.threshold:
-            pass
-        elif self.ELEMENT_ORDER_LEFT[1] - self.ELEMENT_ORDER_LEFT[2] >= self.threshold:
-            pass
-
-    def compare_and_prepare_to_change(self, column_identifier_left, column_identifier_right, row_num, row):
-        left_value = row[column_identifier_left]
-        right_value = row[column_identifier_right]
+    def compare_and_prepare_to_change(self, column_identifiers_left, column_identifiers_right, row_num, row, i):
+        left_value = row[column_identifiers_left[i]]
+        right_value = row[column_identifiers_right[i]]
         
         if None in (left_value, right_value) or math.isnan(left_value) or math.isnan(right_value):
             return
 
-        if left_value - right_value > self.threshold:
-            self.to_change.append((int(row_num), column_identifier_left))
+        left_del = False
+        right_del = False
 
-        elif right_value - left_value > self.threshold:
-            self.to_change.append((int(row_num), column_identifier_right))
+        # compare diff between left and right side. If left or right higher than treshold_left_to_right + (left or right) remove the other
+        if left_value - right_value > self.treshold_left_to_right:
+            left_del = True
+            self.to_change.append((int(row_num), column_identifiers_left[i]))
+            #print("LR", left_value, right_value, ":", left_value)
 
+        elif right_value - left_value > self.treshold_left_to_right:
+            right_del = True
+            self.to_change.append((int(row_num), column_identifiers_right[i]))
+            #print("LR",left_value, right_value, ":", right_value)
+
+        if i == 1:
+          return
+        
+        # check distance between depth and next deph is lower than threshold_between_depth
+        left_lower_value = row[column_identifiers_left[i - 1]]
+        right_lower_value = row[column_identifiers_right[i - 1]]
+
+        if left_lower_value + self.threshold_between_depth < left_value and not left_del:
+            self.to_change.append((int(row_num), column_identifiers_left[i]))
+            #print("D",left_value, left_lower_value, ":", left_value)
+
+        if right_lower_value + self.threshold_between_depth < right_value and not right_del:
+            self.to_change.append((int(row_num), column_identifiers_right[i]))
+            #print("D",right_value, right_lower_value, ":", right_value)
 
     def process(self, df: pd.DataFrame, station: str):
         logging.debug(f"parsing data for station {station} ...")
@@ -73,16 +92,7 @@ class BulkConductivityDriftPS(ProcessingStep):
             return None
 
         for row_num, row in df.iterrows():
-          [self.compare_and_prepare_to_change(self.ELEMENT_ORDER_LEFT[i], self.ELEMENT_ORDER_RIGHT[i],row_num, row) for i in range(3)]
-
-        #     # iter over left and right
-        #     for column_lr in [self.ELEMENT_ORDER_LEFT, self.ELEMENT_ORDER_RIGHT]:
-        #         # iter through each entry of ELEMENT_ORDER_RIGHT | ELEMENT_ORDER_LEFT and compare each entry with the
-        #         # other two to check if one of them is threshold units above the others, if so add them to to_change list
-        #         [
-        #             self.compare_and_prepare_to_change(column_lr, row_num, row, i)
-        #             for i in range(len(column_lr))
-        #         ]
+          [self.compare_and_prepare_to_change(self.ELEMENT_ORDER_LEFT, self.ELEMENT_ORDER_RIGHT,row_num, row, i) for i in range(3)]
 
         # run do change for all to change values
         [
