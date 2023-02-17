@@ -50,7 +50,21 @@ class BulkConductivityDriftPS(ProcessingStep):
         if None in (value, value_1, value_2) or math.isnan(value):
             return
 
+        if value - value_1 > self.threshold or value - value_2 > self.threshold:
+            print(value,value_1,value_2, ":", row[column_lr[i]])
+            self.to_change.append((int(row_num), column_lr[i]))
+
+    # original function
+    def compare_and_prepare_to_change_orig(self, column_lr, row_num, row, i):
+        value = row[column_lr[i]]
+        value_1 = row[column_lr[(i + 1) % len(column_lr)]]
+        value_2 = row[column_lr[(i + 2) % len(column_lr)]]
+
+        if None in (value, value_1, value_2) or math.isnan(value):
+            return
+
         if value - value_1 > self.threshold and value - value_2 > self.threshold:
+            print(value,value_1,value_2, ":", row[column_lr[i]])
             self.to_change.append((int(row_num), column_lr[i]))
 
     def process(self, df: pd.DataFrame, station: str):
@@ -73,7 +87,7 @@ class BulkConductivityDriftPS(ProcessingStep):
             # iter over left and right
             for column_lr in [self.ELEMENT_ORDER_LEFT, self.ELEMENT_ORDER_RIGHT]:
                 # iter through each entry of ELEMENT_ORDER_RIGHT | ELEMENT_ORDER_LEFT and compare each entry with the
-                # other two to check if one of them is 50 % above the others, if so add them to to_change list
+                # other two to check if one of them is threshold units above the others, if so add them to to_change list
                 [
                     self.compare_and_prepare_to_change(column_lr, row_num, row, i)
                     for i in range(len(column_lr))
