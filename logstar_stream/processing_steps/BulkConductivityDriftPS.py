@@ -64,7 +64,6 @@ class BulkConductivityDriftPS(ProcessingStep):
             return
 
         if value - value_1 > self.threshold and value - value_2 > self.threshold:
-            print(value,value_1,value_2, ":", row[column_lr[i]])
             self.to_change.append((int(row_num), column_lr[i]))
 
     def process(self, df: pd.DataFrame, station: str):
