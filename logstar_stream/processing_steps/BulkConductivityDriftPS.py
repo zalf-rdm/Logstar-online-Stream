@@ -1,12 +1,10 @@
+from logstar_stream.processing_steps.ProcessingStep import ProcessingStep
 from re import M
 from typing import List, Dict
 import math
 import logging
 
 import pandas as pd
-
-from logstar_stream.processing_steps.ProcessingStep import ProcessingStep
-
 
 class BulkConductivityDriftPS(ProcessingStep):
     ps_name = "BulkConductivityDriftPS"
@@ -20,7 +18,8 @@ class BulkConductivityDriftPS(ProcessingStep):
 
     treshold_left_to_right = 50
     threshold_between_depth = 60
-
+    threshold_max_value = 400
+    
     ELEMENT_ORDER_LEFT = [
         "bulk_conductivity_left_30_cm",
         "bulk_conductivity_left_60_cm",
@@ -36,44 +35,55 @@ class BulkConductivityDriftPS(ProcessingStep):
         super().__init__(kwargs)
         self.treshold_left_to_right = float(kwargs['treshold_left_to_right']) if "treshold_left_to_right" in kwargs else self.treshold_left_to_right
         self.threshold_between_depth = float(kwargs['threshold_between_depth']) if "threshold_between_depth" in kwargs else self.threshold_between_depth
+        self.threshold_max_value = float(kwargs['threshold_max_value']) if "threshold_max_value" in kwargs else self.threshold_max_value
 
         self.to_change = []
 
-    def compare_and_prepare_to_change(self, column_identifiers_left, column_identifiers_right, row_num, row, i):
-        left_value = row[column_identifiers_left[i]]
-        right_value = row[column_identifiers_right[i]]
+    def compare_and_prepare_to_change(self, row, row_num):
         
-        if None in (left_value, right_value) or math.isnan(left_value) or math.isnan(right_value):
-            return
+        for i in range(3):
+            left_value = row[self.ELEMENT_ORDER_LEFT[i]]
+            right_value = row[self.ELEMENT_ORDER_RIGHT[i]]
 
-        left_del = False
-        right_del = False
+            left_del = False
+            right_del = False
 
-        # compare diff between left and right side. If left or right higher than treshold_left_to_right + (left or right) remove the other
-        if left_value - right_value > self.treshold_left_to_right:
-            left_del = True
-            self.to_change.append((int(row_num), column_identifiers_left[i]))
-            #print("LR", left_value, right_value, ":", left_value)
+            if math.isnan(left_value):
+                pass
+            # compare diff between left and right side. If left or right higher than treshold_left_to_right + (left or right) remove the other
+            elif left_value - right_value > self.treshold_left_to_right or left_value > self.threshold_max_value:
+                    left_del = True
+                    self.to_change.append((int(row_num), self.ELEMENT_ORDER_LEFT[i]))
+            
+            if math.isnan(right_value):
+                pass
+            elif right_value - left_value > self.treshold_left_to_right or right_value > self.threshold_max_value:
+                    right_del = True
+                    self.to_change.append((int(row_num), self.ELEMENT_ORDER_RIGHT[i]))
 
-        elif right_value - left_value > self.treshold_left_to_right:
-            right_del = True
-            self.to_change.append((int(row_num), column_identifiers_right[i]))
-            #print("LR",left_value, right_value, ":", right_value)
+            # if 30cm depth
+            if i == 0: 
+              continue
 
-        if i == 1:
-          return
-        
-        # check distance between depth and next deph is lower than threshold_between_depth
-        left_lower_value = row[column_identifiers_left[i - 1]]
-        right_lower_value = row[column_identifiers_right[i - 1]]
 
-        if left_lower_value + self.threshold_between_depth < left_value and not left_del:
-            self.to_change.append((int(row_num), column_identifiers_left[i]))
-            #print("D",left_value, left_lower_value, ":", left_value)
-
-        if right_lower_value + self.threshold_between_depth < right_value and not right_del:
-            self.to_change.append((int(row_num), column_identifiers_right[i]))
-            #print("D",right_value, right_lower_value, ":", right_value)
+            # check distance between depth and next depth is lower than threshold_between_depth
+            left_lower_value = row[self.ELEMENT_ORDER_LEFT[i - 1]]
+            right_lower_value = row[self.ELEMENT_ORDER_RIGHT[i - 1]]
+            
+            # check if nan or none is on left side
+            if  None in (left_value, left_lower_value) or math.isnan(left_value) or math.isnan(left_lower_value):
+                pass
+            
+            elif left_lower_value + self.threshold_between_depth < left_value and not left_del:
+                self.to_change.append((int(row_num), self.ELEMENT_ORDER_LEFT[i]))
+                
+            if  None in (right_value, right_lower_value) or math.isnan(right_value) or math.isnan(right_lower_value):
+                pass
+            
+            elif right_lower_value + self.threshold_between_depth < right_value and not right_del:
+                self.to_change.append((int(row_num), self.ELEMENT_ORDER_RIGHT[i]))
+            
+            
 
     def process(self, df: pd.DataFrame, station: str):
         logging.debug(f"parsing data for station {station} ...")
@@ -90,9 +100,9 @@ class BulkConductivityDriftPS(ProcessingStep):
 
         if df is None:
             return None
-
+        # iterate over each row of the given data
         for row_num, row in df.iterrows():
-          [self.compare_and_prepare_to_change(self.ELEMENT_ORDER_LEFT, self.ELEMENT_ORDER_RIGHT,row_num, row, i) for i in range(3)]
+          [self.compare_and_prepare_to_change(row, row_num)]
 
         # run do change for all to change values
         [
