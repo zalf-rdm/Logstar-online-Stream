@@ -1,4 +1,4 @@
-[build-system]
+[build]
 requires =[
       "setuptools",
       "requests==2.28.1",
