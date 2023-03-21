@@ -11,9 +11,4 @@ setup(
     author_email="marcel.wallschlaeger@zalf.de",
     zip_safe=False,
     packages=["logstar_stream", "logstar_stream.processing_steps"],
-    install_requires=[
-      "requests==2.28.1",
-      "sqlalchemy==1.4.39",
-      "pandas==1.4.3"
-    ],
 )
