@@ -26,6 +26,17 @@ class WeatherStationPrecipitationPS(ProcessingStep):
         super().__init__(kwargs)
 
     def process(self, df: pd.DataFrame, station: str, argument: List = None):
+        """
+        Process the given DataFrame by checking for anomalies in the specified station's measurements.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to be processed.
+            station (str): The station name.
+            argument (List, optional): Additional argument. Defaults to None.
+
+        Returns:
+            pd.DataFrame: The processed DataFrame with anomalous measurements replaced.
+        """
         if station not in self.ALLOWED_STATIONS:
             return
 

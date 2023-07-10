@@ -33,7 +33,17 @@ def build_url(conf, station, channel):
 
 
 def do_sensor_mapping(station, mapping):
-    """get readable name for given station from mapping"""
+    """
+    get readable name for given station from mapping
+
+
+    :param station: The station to map.
+    :type station: Any
+    :param mapping: The mapping to use.
+    :type mapping: dict
+    :return: The mapped key or the original station.
+    :rtype: Any
+    """
     for key, value in mapping["sensor-mapping"].items():
         if value["value"] in station:
             return key
@@ -45,6 +55,17 @@ FIELDS_TO_IGNORE = ["date", "time"]
 
 
 def do_column_name_mapping(sensor_name, header, mapping):
+    """
+    Maps column names in the header based on a sensor name and a mapping dictionary.
+
+    Args:
+        sensor_name (str): The name of the sensor.
+        header (dict): The header dictionary containing column names as keys and column names as values.
+        mapping (dict): The mapping dictionary containing sensor mappings and measurement classes.
+
+    Returns:
+        dict: A new header dictionary with mapped column names.
+    """
     if (
         sensor_name not in mapping["sensor-mapping"]
         or not mapping["sensor-mapping"][sensor_name]
@@ -75,23 +96,43 @@ def do_column_name_mapping(sensor_name, header, mapping):
                     continue
 
                 r = pattern.match(c_name_remote)
-                if "*" in measurement_class["position"]:
-                    c_name = "{}_{}_{}_cm".format(
-                        name,
-                        measurement_class["position"]["*"]["side"],
-                        measurement_class["position"]["*"]["depth"],
-                    )
-                else:
+
+                # c_name_remote can differ a lot, the design of this names is not properly choosen by UP GmbH
+                # worst case is weather data which supports 3 different pattern:
+
+                # case 1: "WS1_LT_3 - °C
+                if r["number"] is not None:
                     c_name = "{}_{}_{}_cm".format(
                         name,
                         measurement_class["position"][r["number"]]["side"],
                         measurement_class["position"][r["number"]]["depth"],
+                    )
+                # case 2 "WS1_WG_x - m/s"
+                elif r["number"] is None and r["string"] is not None:
+                    c_name = "{}_{}".format(
+                        name,
+                        r["string"],
+                    )
+                # case 3 "WS1_WR - grad"
+                elif r["number"] is None and r["string"] is None:
+                    c_name = "{}".format(
+                        name,
                     )
                 new_header[k] = c_name
     return new_header
 
 
 def request_data(url):
+    """
+    Request data from a specified URL.
+
+    Args:
+        url (str): The URL to request data from.
+
+    Returns:
+        str or None: The response text if the request is successful, or None if there is an error.
+
+    """
     logging.debug("requesting {} ...".format(url))
     try:
         r = requests.get(url)
@@ -105,6 +146,16 @@ def request_data(url):
 
 
 def download_data(conf, station):
+    """
+    Downloads data from a given station.
+
+    Args:
+        conf (dict): The configuration settings for downloading the data.
+        station (str): The name of the station to download data from.
+
+    Returns:
+        dict: The downloaded data as a dictionary, or None if the download fails.
+    """
     url = build_url(conf, station=station, channel=1)
     request = request_data(url)
     if request is None:

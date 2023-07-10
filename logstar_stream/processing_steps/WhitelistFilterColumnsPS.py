@@ -1,12 +1,11 @@
 import pandas as pd
-from typing import Dict
 import logging
 
 from logstar_stream.processing_steps.ProcessingStep import ProcessingStep
 
 
-class FilterColumnsPS(ProcessingStep):
-    ps_name = "FilterColumnsPS"
+class WhitelistFilterColumnsPS(ProcessingStep):
+    ps_name = "WhitelistFilterColumnsPS"
 
     ps_description = """
       Filters out all columns not given via the columns argument
@@ -20,7 +19,17 @@ class FilterColumnsPS(ProcessingStep):
         super().__init__(kwargs)
 
     def process(self, df: pd.DataFrame, station: str):
-        columns = self.kwargs["columns"].split(" ")
+        """
+        Process the given DataFrame for a specific station.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to be processed.
+            station (str): The name of the station.
+
+        Returns:
+            pd.DataFrame: The processed DataFrame.
+        """
+        columns = self.args["columns"].split(" ")
         logging.debug(
             f"running {self.ps_name} and only pass through following columns: {columns} ..."
         )
@@ -36,3 +45,5 @@ class FilterColumnsPS(ProcessingStep):
         df = df[df.columns.intersection(columns, sort=False)]
 
         return df[columns]
+
+
