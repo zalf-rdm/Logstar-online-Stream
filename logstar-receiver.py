@@ -160,8 +160,9 @@ def main():
     sensor_mapping = None
     if args.sensor_mapping:
         if os.path.exists(args.sensor_mapping):
-            with open(args.sensor_mapping) as jsonfile:
-                sensor_mapping = json.load(jsonfile)
+            with open(args.sensor_mapping, "r") as jsonfile:
+                jsonfile_contents = jsonfile.read()
+                sensor_mapping = json.loads(jsonfile_contents)
             logging.debug(f"Found sensor mapping json under: {args.sensor_mapping}")
 
     # splits station names from conf given as space seperated string to list
