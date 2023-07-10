@@ -56,12 +56,31 @@ class JumpCheckPS(ProcessingStep):
         self.env = {}
 
     def change_values(self, df, station_messurement_env):
+        """
+        Change values in the given dataframe based on the station measurement environment.
+
+        Parameters:
+            df (pandas.DataFrame): The dataframe to modify.
+            station_messurement_env (StationMeasurementEnvironment): The object containing information about the station measurement environment.
+
+        Returns:
+            None
+        """
         [
             df := self.__do_change__(df, row_num, column_name)
             for row_num, column_name in station_messurement_env.to_change
         ]
 
     def reset_counters(self, station_messurement_env):
+        """
+        Reset the counters of the station measurement environment.
+
+        Parameters:
+            station_messurement_env (object): The station measurement environment object.
+
+        Returns:
+            None
+        """
         station_messurement_env.jump_duration = 0
         station_messurement_env.to_change = []
 

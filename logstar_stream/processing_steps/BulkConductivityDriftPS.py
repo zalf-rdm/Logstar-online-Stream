@@ -1,6 +1,4 @@
 from logstar_stream.processing_steps.ProcessingStep import ProcessingStep
-from re import M
-from typing import List, Dict
 import math
 import logging
 
@@ -83,9 +81,18 @@ class BulkConductivityDriftPS(ProcessingStep):
             elif right_lower_value + self.threshold_between_depth < right_value and not right_del:
                 self.to_change.append((int(row_num), self.ELEMENT_ORDER_RIGHT[i]))
             
-            
 
     def process(self, df: pd.DataFrame, station: str):
+        """
+        Process the given DataFrame for a specific station.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to process.
+            station (str): The name of the station.
+
+        Returns:
+            pd.DataFrame: The processed DataFrame.
+        """
         logging.debug(f"parsing data for station {station} ...")
 
         # check if all required fields are available
