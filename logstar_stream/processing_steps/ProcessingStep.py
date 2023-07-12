@@ -68,11 +68,11 @@ class ProcessingStep(object):
         :param column_name: column name of the value which is to edit
         """
         row = df.iloc[row_num]
-        logging.debug(
-            f"{self.ps_name} | {column_name} {row['date']} {row['time']}: {row[column_name]} -> {self.ERROR_VALUE}"
-        )
         # depends on config.dateTime if 1: „date“: „2020-04-01“, „time“: „00:00:00“
         if "date" in row and "time" in row:
+            logging.debug(
+                f"{self.ps_name} | {column_name} {row['date']} {row['time']}: {row[column_name]} -> {self.ERROR_VALUE}"
+            )
             changed_object = {
                 "messurement": column_name,
                 "date": row["date"],
@@ -88,12 +88,18 @@ class ProcessingStep(object):
                 "old_value": df.at[row_num, column_name],
                 "new_value": self.ERROR_VALUE,
             }
+            logging.debug(
+                f"{self.ps_name} | {column_name} {row['dateTime']}: {row[column_name]} -> {self.ERROR_VALUE}"
+            )
         else:
             changed_object = {
                 "messurement": column_name,
                 "old_value": df.at[row_num, column_name],
                 "new_value": self.ERROR_VALUE,
             }
+            logging.debug(
+                f"{self.ps_name} | {column_name}: {row[column_name]} -> {self.ERROR_VALUE}"
+            )
 
         self.changed.append(changed_object)
         df.at[row_num, column_name] = self.ERROR_VALUE
