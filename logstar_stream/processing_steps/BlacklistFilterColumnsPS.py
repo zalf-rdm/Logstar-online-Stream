@@ -3,6 +3,7 @@ import logging
 
 from logstar_stream.processing_steps.ProcessingStep import ProcessingStep
 
+
 class BlacklistFilterColumnsPS(ProcessingStep):
     ps_name = "BlacklistFilterColumnsPS"
 

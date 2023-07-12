@@ -71,31 +71,43 @@ class ProcessingStep(object):
         logging.debug(
             f"{self.ps_name} | {column_name} {row['date']} {row['time']}: {row[column_name]} -> {self.ERROR_VALUE}"
         )
-        changed_object = {
-            "messurement": column_name,
-            "date": row["date"],
-            "time": row["time"],
-            "old_value": df.at[row_num, column_name],
-            "new_value": self.ERROR_VALUE,
-        }
+        # depends on config.dateTime if 1: „date“: „2020-04-01“, „time“: „00:00:00“
+        if "date" in row and "time" in row:
+            changed_object = {
+                "messurement": column_name,
+                "date": row["date"],
+                "time": row["time"],
+                "old_value": df.at[row_num, column_name],
+                "new_value": self.ERROR_VALUE,
+            }
+        # if 0 (default): „dateTime“: „2020-04-01 00:00:00“
+        elif "dateTime" in row:
+            changed_object = {
+                "messurement": column_name,
+                "dateTime": row["dateTime"],
+                "old_value": df.at[row_num, column_name],
+                "new_value": self.ERROR_VALUE,
+            }
+        else:
+            changed_object = {
+                "messurement": column_name,
+                "old_value": df.at[row_num, column_name],
+                "new_value": self.ERROR_VALUE,
+            }
+
         self.changed.append(changed_object)
         df.at[row_num, column_name] = self.ERROR_VALUE
         return df
 
-    def write_log(self, station):
+    def write_log(self, station) -> None:
         """
-        write error log for ProcessingStep
+        Writes a log entry for the given station.
 
-        self.changed: a list of dicts of entries changed like:
-          changed = [
-            {
-              "messurement": "precipitation_surface_-200_cm",
-              "date": "2020-01-01",
-              "time": "16:45:00",
-              "old_value": "5.0",
-              "new_value": "nan"
-            },
-          ]
+        Parameters:
+            station (str): The name of the station.
+
+        Returns:
+            None
         """
 
         if not os.path.exists(PS_LOGGING_DIR):
@@ -108,13 +120,19 @@ class ProcessingStep(object):
             return
 
         log_filename = self.ps_name + "_" + station + ".log"
+
         with open(os.path.join(PS_LOGGING_DIR, log_filename), "a+") as f:
-            [
-                f.write(
-                    f"{d['date']} {d['time']} | {station} -- {d['messurement']}: changed from {d['old_value']} -> {d['new_value']}\n"
-                )
-                for d in self.changed
-            ]
+            for d in self.changed:
+                # depends on config.dateTime
+                if "date" in d and "time" in d:
+                    log_string = f"{d['date']} {d['time']} | {station} -- {d['messurement']}: changed from {d['old_value']} -> {d['new_value']}\n"
+                elif "dateTime" in d:
+                    log_string = f"{d['dateTime']} | {station} -- {d['messurement']}: changed from {d['old_value']} -> {d['new_value']}\n"
+                else:
+                    log_string = f" ??? | {station} -- {d['messurement']}: changed from {d['old_value']} -> {d['new_value']}\n"
+
+                f.write(log_string)
+
         logging.debug(
             f"finished writing {len(self.changed)} entries into changelog for {log_filename} ..."
         )

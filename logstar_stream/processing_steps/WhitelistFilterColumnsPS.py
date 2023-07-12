@@ -45,5 +45,3 @@ class WhitelistFilterColumnsPS(ProcessingStep):
         df = df[df.columns.intersection(columns, sort=False)]
 
         return df[columns]
-
-
