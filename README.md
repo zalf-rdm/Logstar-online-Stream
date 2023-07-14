@@ -46,9 +46,11 @@ Run programm in download mode. Downloads data in from startdate to enddate and s
 python logstar-receiver.py
 ```
 
+*if writing to csv files make sure that the folder you write to is empty. Else logstar-receiver will append the data to the current files.*
+
 Example usage of processing step FilterColumnsPS with a number of columns to filter:
 ```bash
-python logstar-receiver.py -m sensor_mapping.json -nodb -ps FilterColumnsPS columns="time date water_content_right_30_cm water_content_right_60_cm water_content_right_90_cm water_content_left_30_cm water_content_left_60_cm water_content_left_90_cm" -co data/
+python logstar-receiver.py -m sensor_mapping.json -nodb  -co data/ -ps BlacklistFilterColumnsPS columns="battery_voltage signal_strength"
 ```
 
 To find out more about processing steps lookup the additional [docs](./docs/processings_steps.md). 

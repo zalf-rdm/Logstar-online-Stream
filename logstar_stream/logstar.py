@@ -45,7 +45,7 @@ def do_sensor_mapping(station, mapping):
     :rtype: Any
     """
     for key, value in mapping["sensor-mapping"].items():
-        if value["value"] in station:
+        if station in value["values"]:
             return key
     logging.debug("Mapping for sensor {} not found ...".format(station))
     return station
@@ -255,6 +255,7 @@ def manage_dl_db(
                 sep=",",
                 quotechar='"',
                 header=True,
+                mode='a',
                 doublequote=False,
                 quoting=csv.QUOTE_MINIMAL,
                 index=False,
