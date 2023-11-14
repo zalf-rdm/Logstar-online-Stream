@@ -15,20 +15,16 @@ import pandas as pd
 LOGSTAR_API_URL = "https://logstar-online.de/api"
 
 
-def build_url(conf, station, channel):
+def build_url(conf, station, channel=0):
     """build url to request from
     docs: https://logstar-online.de/api/{apiKey}/{Stationname}/{StartTag}/{EndTag}/{Channellist}/{DateTime}/{GeoData}
     """
-    url = "{}/{}/{}/{}/{}/{}/{}/{}".format(
-        LOGSTAR_API_URL,
-        conf["apikey"],
-        station,
-        conf["startdate"],
-        conf["enddate"],
-        channel,
-        conf["datetime"],
-        conf["geodata"],
-    )
+    apikey = conf["apikey"]
+    startdate = conf["startdate"]
+    enddate = conf["enddate"]
+    datetime = conf["datetime"]
+    geodata = conf["geodata"]
+    url = f"{LOGSTAR_API_URL}/{apikey}/{station}/{startdate}/{enddate}/{channel}/{datetime}/{geodata}"
     return url
 
 
@@ -156,30 +152,16 @@ def download_data(conf, station):
     Returns:
         dict: The downloaded data as a dictionary, or None if the download fails.
     """
-    url = build_url(conf, station=station, channel=1)
-    request = request_data(url)
-    if request is None:
-        return None
-    number_of_channels = 1
+    url = build_url(conf, station=station)
+
     try:
-        dict_request = json.loads(request)
-        number_of_channels = len(dict_request["header"].keys()) - 1  # - time - date
+        request = request_data(url)
+        return json.loads(request)
     except:
         logging.error(
-            "Could not calculate number of channels for station {}. Request may be broken ...".format(
-                station
-            )
+            f"Error when downloading data for station {station} using url {url}...\n{request}"
         )
         return None
-
-    # who are you, starting to count with 1?
-    # building channel string for build_url
-    channels = ",".join(map(str, range(1, number_of_channels)))
-    url = build_url(conf, station=station, channel=channels)
-    request = request_data(url)
-    if request is None:
-        return None
-    return json.loads(request)
 
 
 def manage_dl_db(
@@ -216,8 +198,10 @@ def manage_dl_db(
 
         # download data
         data = download_data(conf, station)
-        if data is None:
-            # no new data or something went wrong while downloading the data
+
+        # no new data or something went wrong while downloading the data
+        if data is None or "data" not in data:
+            logging.error(f"could not download data for station {name}\n {data}")
             continue
 
         # rename table column names, or csv column names
@@ -255,7 +239,7 @@ def manage_dl_db(
                 sep=",",
                 quotechar='"',
                 header=True,
-                mode='a',
+                mode="a",
                 doublequote=False,
                 quoting=csv.QUOTE_MINIMAL,
                 index=False,
