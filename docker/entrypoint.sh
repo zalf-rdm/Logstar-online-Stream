@@ -3,7 +3,7 @@
 CMD="python /Logstar-online-Stream/logstar-receiver.py"
 
 # handle debug mode (-v)
-if [[ -v LOGSTAR_DEBUG = true ]]; then
+if [ "$LOGSTAR_DEBUG" = true ]; then
     LOGSTAR_DEBUG="-v"
  else
     LOGSTAR_DEBUG=""
