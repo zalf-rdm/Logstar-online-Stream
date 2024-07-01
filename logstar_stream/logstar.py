@@ -6,6 +6,7 @@ import os
 import csv
 from typing import List
 
+import sqlalchemy as sq
 import pandas as pd
 
 """
@@ -227,9 +228,14 @@ def manage_dl_db(
         if database_engine:
             table_name = db_table_prefix + name
             logging.info("writing {} to database ...".format(table_name))
-            df.to_sql(
-                table_name, con=database_engine, schema=db_schema, if_exists="append"
-            )
+            if "dateTime" in cols:
+                df.to_sql(
+                    table_name, con=database_engine, schema=db_schema, if_exists="append", index=False, dtype={"dateTime": sq.types.TIMESTAMP(timezone=False)}
+                )
+            else:
+                df.to_sql(
+                    table_name, con=database_engine, schema=db_schema, if_exists="append", index=False
+                )
 
         # write to file
         if csv_folder:
