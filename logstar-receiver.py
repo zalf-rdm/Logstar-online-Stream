@@ -261,9 +261,8 @@ def main():
             )
         try:
             while True:
-                today = datetime.today()
-                tomorrow = today + datetime.datetime.timedelta(days=1)
-                conf["startdate"] = today.strftime("%Y-%m-%d")  # %H:%M:%S
+                today = datetime.datetime.today()
+                conf["startdate"] = datetime.strftime("%Y-%m-%d")  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime("%Y-%m-%d")
                 logstar.manage_dl_db(
                     conf,
