@@ -156,7 +156,7 @@ def download_data(conf, station, timeout=15):
     url = build_url(conf, station=station)
 
     try:
-        request = request_data(url, timeout)
+        request = request_data(url, timeout=timeout)
         return json.loads(request)
     except:
         logging.error(

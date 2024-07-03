@@ -62,10 +62,10 @@ def main():
 
     parser.add_argument(
         "--timeout",
-        type=str,
+        type=int,
         dest="timeout",
         help="timeout in seconds to wait for logstar server ...",
-        default="15",
+        default=15,
     )
 
     # csv
@@ -300,7 +300,7 @@ def main():
 
     if database_engine:
         logging.info("Closing database connection ...")
-        database_engine.disconnect()
+        database_engine.close()
     logging.info("bye bye ...")
 
 
