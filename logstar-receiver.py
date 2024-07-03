@@ -60,6 +60,14 @@ def main():
         help="path to json file for raw sensor name to tablename mapping",
     )
 
+    parser.add_argument(
+        "--timeout",
+        type=str,
+        dest="timeout",
+        help="timeout in seconds to wait for logstar server ...",
+        default="15",
+    )
+
     # csv
     parser.add_argument(
         "-co",
@@ -98,6 +106,7 @@ def main():
         required=False,
         help="Prefix set for tables in Database",
     )
+
     parser.add_argument(
         "-dbs",
         "--db_schema",
@@ -271,6 +280,7 @@ def main():
                     sensor_mapping=sensor_mapping,
                     db_schema=db_schema,
                     db_table_prefix=db_table_prefix,
+                    timeout=args.timeout,
                 )
                 time.sleep(interval)
         except KeyboardInterrupt:
@@ -285,6 +295,7 @@ def main():
             csv_folder=args.csv_outfolder,
             db_schema=db_schema,
             db_table_prefix=db_table_prefix,
+            timeout=args.timeout,
         )
 
     if database_engine:

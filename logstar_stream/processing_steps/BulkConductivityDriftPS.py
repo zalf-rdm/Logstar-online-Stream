@@ -51,7 +51,6 @@ class BulkConductivityDriftPS(ProcessingStep):
         self.to_change = []
 
     def compare_and_prepare_to_change(self, row, row_num):
-
         for i in range(3):
             left_value = row[self.ELEMENT_ORDER_LEFT[i]]
             right_value = row[self.ELEMENT_ORDER_RIGHT[i]]

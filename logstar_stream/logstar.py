@@ -119,7 +119,7 @@ def do_column_name_mapping(sensor_name, header, mapping):
     return new_header
 
 
-def request_data(url):
+def request_data(url, timeout):
     """
     Request data from a specified URL.
 
@@ -132,7 +132,7 @@ def request_data(url):
     """
     logging.debug("requesting {} ...".format(url))
     try:
-        r = requests.get(url)
+        r = requests.get(url, timeout=timeout)
     except:
         return None
     if r.status_code == 200:
@@ -142,7 +142,7 @@ def request_data(url):
         return None
 
 
-def download_data(conf, station):
+def download_data(conf, station, timeout=15):
     """
     Downloads data from a given station.
 
@@ -156,7 +156,7 @@ def download_data(conf, station):
     url = build_url(conf, station=station)
 
     try:
-        request = request_data(url)
+        request = request_data(url, timeout)
         return json.loads(request)
     except:
         logging.error(
@@ -173,6 +173,7 @@ def manage_dl_db(
     csv_folder=None,
     db_schema=None,
     db_table_prefix=None,
+    timeout=15,
 ):
     """
     main routine to download data and save it to database and|or csv
@@ -198,7 +199,7 @@ def manage_dl_db(
         )
 
         # download data
-        data = download_data(conf, station)
+        data = download_data(conf, station, timeout)
 
         # no new data or something went wrong while downloading the data
         if data is None or "data" not in data:
@@ -230,11 +231,20 @@ def manage_dl_db(
             logging.info("writing {} to database ...".format(table_name))
             if "dateTime" in cols:
                 df.to_sql(
-                    table_name, con=database_engine, schema=db_schema, if_exists="append", index=False, dtype={"dateTime": sq.types.TIMESTAMP(timezone=False)}
+                    table_name,
+                    con=database_engine,
+                    schema=db_schema,
+                    if_exists="append",
+                    index=False,
+                    dtype={"dateTime": sq.types.TIMESTAMP(timezone=False)},
                 )
             else:
                 df.to_sql(
-                    table_name, con=database_engine, schema=db_schema, if_exists="append", index=False
+                    table_name,
+                    con=database_engine,
+                    schema=db_schema,
+                    if_exists="append",
+                    index=False,
                 )
 
         # write to file
