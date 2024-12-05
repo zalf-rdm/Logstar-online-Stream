@@ -234,6 +234,7 @@ def main():
                     "authentication": "ActiveDirectoryIntegrated",
                 },
             )
+            database_engine = create_engine(connection_url)
 
         else:
             logging.error(
