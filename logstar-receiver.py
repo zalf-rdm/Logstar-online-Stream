@@ -300,7 +300,7 @@ def main():
 
     if database_engine:
         logging.info("Closing database connection ...")
-        database_engine.close()
+        database_engine.dispose()
     logging.info("bye bye ...")
 
 
