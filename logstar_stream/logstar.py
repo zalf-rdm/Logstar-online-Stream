@@ -213,11 +213,20 @@ def manage_dl_db(
             )
         # build pandas df from data
         df = pd.DataFrame(data["data"])
-        # making date and time occure in beginning
-        cols = df.columns.tolist()
-        cols = cols[-2:] + cols[:-2]
-        df = df[cols]
+        
         df = df.rename(columns=data["header"])
+        # depending on LOGSTAR_DAYTIME="0"
+        # making datetime occure in beginning
+        if "Datetime" in df.columns:
+            cols = df.columns.tolist()
+            cols.insert(0, cols.pop(cols.index("Datetime")))
+            df = df[cols]
+        elif "Date" in df.columns and "Time" in df.columns: 
+          # making date and time occure in beginning
+            cols = df.columns.tolist()
+            cols.insert(0, cols.pop(cols.index("Date")))
+            cols.insert(0, cols.pop(cols.index("Time")))          
+            df = df[cols]
 
         # give data to process
         if processing_steps is not None:
@@ -229,14 +238,14 @@ def manage_dl_db(
         if database_engine:
             table_name = db_table_prefix + name
             logging.info("writing {} to database ...".format(table_name))
-            if "dateTime" in cols:
+            if "Datetime" in cols:
                 df.to_sql(
                     table_name,
                     con=database_engine,
                     schema=db_schema,
                     if_exists="append",
                     index=False,
-                    dtype={"dateTime": sq.types.TIMESTAMP(timezone=False)},
+                    dtype={"Datetime": sq.types.TIMESTAMP(timezone=False)},
                 )
             else:
                 df.to_sql(
