@@ -88,7 +88,13 @@ def main():
         action="append",
         help="adds a processingstep to work on downloaded data. This only applies if ongoing is not set",
     )
-
+    parser.add_argument(
+        "-ps-force",
+        "--processing-step-force",
+        dest="ps_force",
+        action="store_true",
+        help="force processings steps to work in ongoing mode, EXPERIMENTAL feature ...",
+    )
     # db
     parser.add_argument(
         "-nodb",
@@ -172,7 +178,9 @@ def main():
             with open(args.sensor_mapping, "r") as jsonfile:
                 jsonfile_contents = jsonfile.read()
                 sensor_mapping = json.loads(jsonfile_contents)
-            logging.debug(f"Found sensor mapping json under: {args.sensor_mapping}")
+            logging.info(f"Found sensor mapping json under: {args.sensor_mapping}")
+        else:
+            logging.warning("could not find sensor-mapping file. Therefore, ignored ...")
 
     # splits station names from conf given as space seperated string to list
     try:
@@ -265,10 +273,32 @@ def main():
                 interval
             )
         )
-        if processing_steps:
+        if processing_steps and not args.ps_force:
             logging.warning(
                 f'Processing Steps are set, but currently ignored in "ongoing" mode ...'
             )
+        if args.ps_force:
+            logging.warning(
+                f'Processing Steps are forced to run in "ongoing" mode ...')
+            try:
+              while True:
+                  today = datetime.datetime.today()
+                  tomorrow = today + datetime.timedelta(days=1)
+                  conf["startdate"] = today.strftime("%Y-%m-%d")  # %H:%M:%S
+                  conf["enddate"] = tomorrow.strftime("%Y-%m-%d")
+                  logstar.manage_dl_db(
+                      conf,
+                      database_engine,
+                      processing_steps=processing_steps,
+                      sensor_mapping=sensor_mapping,
+                      db_schema=db_schema,
+                      db_table_prefix=db_table_prefix,
+                      timeout=args.timeout,
+                  )
+                  time.sleep(interval)
+            except KeyboardInterrupt:
+              logging.warning("interrupted, program is going to shutdown ...")
+        
         try:
             while True:
                 today = datetime.datetime.today()
