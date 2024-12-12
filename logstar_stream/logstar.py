@@ -213,12 +213,12 @@ def manage_dl_db(
             )
         # build pandas df from data
         df = pd.DataFrame(data["data"])
-        
         df = df.rename(columns=data["header"])
+        cols = df.columns.tolist()
+        
         # depending on LOGSTAR_DAYTIME="0"
         # making datetime occure in beginning
         if "Datetime" in df.columns:
-            cols = df.columns.tolist()
             cols.insert(0, cols.pop(cols.index("Datetime")))
             df = df[cols]
         elif "Date" in df.columns and "Time" in df.columns: 
