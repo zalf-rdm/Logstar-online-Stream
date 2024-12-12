@@ -5,6 +5,7 @@ data/
 # manually
 csv_out/
 load-config.sh
+load-config-*.sh
 sensor_*
 mapping.json
 
