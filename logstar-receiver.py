@@ -180,7 +180,9 @@ def main():
                 sensor_mapping = json.loads(jsonfile_contents)
             logging.info(f"Found sensor mapping json under: {args.sensor_mapping}")
         else:
-            logging.warning("could not find sensor-mapping file. Therefore, ignored ...")
+            logging.warning(
+                "could not find sensor-mapping file. Therefore, ignored ..."
+            )
 
     # splits station names from conf given as space seperated string to list
     try:
@@ -277,45 +279,35 @@ def main():
             logging.warning(
                 f'Processing Steps are set, but currently ignored in "ongoing" mode ...'
             )
-        if args.ps_force:
-            logging.warning(
-                f'Processing Steps are forced to run in "ongoing" mode ...')
-            try:
-              while True:
-                  today = datetime.datetime.today()
-                  tomorrow = today + datetime.timedelta(days=1)
-                  conf["startdate"] = today.strftime("%Y-%m-%d")  # %H:%M:%S
-                  conf["enddate"] = tomorrow.strftime("%Y-%m-%d")
-                  logstar.manage_dl_db(
-                      conf,
-                      database_engine,
-                      processing_steps=processing_steps,
-                      sensor_mapping=sensor_mapping,
-                      db_schema=db_schema,
-                      db_table_prefix=db_table_prefix,
-                      timeout=args.timeout,
-                  )
-                  time.sleep(interval)
-            except KeyboardInterrupt:
-              logging.warning("interrupted, program is going to shutdown ...")
         
+        manage_dl_db_args = {
+            "conf": conf,
+            "database_engine": database_engine,
+            "processing_steps": processing_steps,
+            "sensor_mapping": sensor_mapping,
+            "db_schema": db_schema,
+            "db_table_prefix": db_table_prefix,
+            "timeout": args.timeout
+        }
+            
+        if args.ps_force:
+            logging.warning(f'Processing Steps are forced to run in "ongoing" mode ...')
+            manage_dl_db_args["processing_steps"] = processing_steps
         try:
             while True:
                 today = datetime.datetime.today()
+                yesterday = today - datetime.timedelta(days=1)
                 tomorrow = today + datetime.timedelta(days=1)
-                conf["startdate"] = today.strftime("%Y-%m-%d")  # %H:%M:%S
+                conf["startdate"] = yesterday.strftime("%Y-%m-%d")  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime("%Y-%m-%d")
                 logstar.manage_dl_db(
-                    conf,
-                    database_engine,
-                    sensor_mapping=sensor_mapping,
-                    db_schema=db_schema,
-                    db_table_prefix=db_table_prefix,
-                    timeout=args.timeout,
+                  **manage_dl_db_args
                 )
+                logging.debug(f"sleeping {interval} seconds ...")
                 time.sleep(interval)
         except KeyboardInterrupt:
             logging.warning("interrupted, program is going to shutdown ...")
+
     else:
         # download data fro with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
         logstar.manage_dl_db(

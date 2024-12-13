@@ -197,7 +197,6 @@ def manage_dl_db(
                 name, conf["startdate"], conf["enddate"]
             )
         )
-
         # download data
         data = download_data(conf, station, timeout)
 
@@ -215,7 +214,6 @@ def manage_dl_db(
         df = pd.DataFrame(data["data"])
         df = df.rename(columns=data["header"])
         cols = df.columns.tolist()
-        
         # depending on LOGSTAR_DAYTIME="0"
         # making datetime occure in beginning
         if "Datetime" in df.columns:
@@ -234,7 +232,6 @@ def manage_dl_db(
 
         if df is None or df.empty:
             continue
-
         if database_engine:
             table_name = db_table_prefix + name
             logging.info("writing {} to database ...".format(table_name))
