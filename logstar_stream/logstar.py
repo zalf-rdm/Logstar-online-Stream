@@ -210,20 +210,24 @@ def manage_dl_db(
             data["header"] = do_column_name_mapping(
                 name, data["header"], sensor_mapping
             )
+
         # build pandas df from data
         df = pd.DataFrame(data["data"])
         df = df.rename(columns=data["header"])
+
+        # Force dateTime always like Datetime
+        df.rename(columns={"dateTime": "Datetime"}, inplace=True)
+
         cols = df.columns.tolist()
         # depending on LOGSTAR_DAYTIME="0"
         # making datetime occure in beginning
-        if "Datetime" in df.columns:
+        if "Datetime" in cols:
             cols.insert(0, cols.pop(cols.index("Datetime")))
             df = df[cols]
-        elif "Date" in df.columns and "Time" in df.columns: 
-          # making date and time occure in beginning
-            cols = df.columns.tolist()
+        elif "Date" in cols and "Time" in cols:
+            # making date and time occure in beginning
             cols.insert(0, cols.pop(cols.index("Date")))
-            cols.insert(0, cols.pop(cols.index("Time")))          
+            cols.insert(0, cols.pop(cols.index("Time")))
             df = df[cols]
 
         # give data to process

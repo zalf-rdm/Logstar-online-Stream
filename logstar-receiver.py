@@ -279,7 +279,7 @@ def main():
             logging.warning(
                 f'Processing Steps are set, but currently ignored in "ongoing" mode ...'
             )
-        
+
         manage_dl_db_args = {
             "conf": conf,
             "database_engine": database_engine,
@@ -287,9 +287,9 @@ def main():
             "sensor_mapping": sensor_mapping,
             "db_schema": db_schema,
             "db_table_prefix": db_table_prefix,
-            "timeout": args.timeout
+            "timeout": args.timeout,
         }
-            
+
         if args.ps_force:
             logging.warning(f'Processing Steps are forced to run in "ongoing" mode ...')
             manage_dl_db_args["processing_steps"] = processing_steps
@@ -300,9 +300,7 @@ def main():
                 tomorrow = today + datetime.timedelta(days=1)
                 conf["startdate"] = yesterday.strftime("%Y-%m-%d")  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime("%Y-%m-%d")
-                logstar.manage_dl_db(
-                  **manage_dl_db_args
-                )
+                logstar.manage_dl_db(**manage_dl_db_args)
                 logging.debug(f"sleeping {interval} seconds ...")
                 time.sleep(interval)
         except KeyboardInterrupt:
