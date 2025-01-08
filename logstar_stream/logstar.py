@@ -49,6 +49,8 @@ def do_sensor_mapping(station, mapping):
 
 
 FIELDS_TO_IGNORE = ["date", "time"]
+
+
 def do_column_name_mapping(sensor_name, header, mapping):
     """
     Maps column names in the header based on a sensor name and a mapping dictionary.
@@ -173,6 +175,7 @@ def manage_dl_db(
     csv_folder=None,
     db_schema=None,
     db_table_prefix=None,
+    datetime_column="Datetime",
     timeout=15,
 ):
     """
@@ -207,9 +210,7 @@ def manage_dl_db(
 
         # rename table column names, or csv column names
         if sensor_mapping:
-            ret = do_column_name_mapping(
-                name, data["header"], sensor_mapping
-            )
+            ret = do_column_name_mapping(name, data["header"], sensor_mapping)
             data["header"] = ret if ret is not None else data["header"]
 
         # build pandas df from data
@@ -225,6 +226,7 @@ def manage_dl_db(
         if "Datetime" in cols:
             cols.insert(0, cols.pop(cols.index("Datetime")))
             df = df[cols]
+
         elif "Date" in cols and "Time" in cols:
             # making date and time occure in beginning
             cols.insert(0, cols.pop(cols.index("Date")))
@@ -237,6 +239,9 @@ def manage_dl_db(
 
         if df is None or df.empty:
             continue
+        
+        df = df.rename(columns={"Datetime": datetime_column})
+
         if database_engine:
             table_name = db_table_prefix + name
             logging.info("writing {} to database ...".format(table_name))
@@ -247,7 +252,7 @@ def manage_dl_db(
                     schema=db_schema,
                     if_exists="append",
                     index=False,
-                    dtype={"Datetime": sq.types.TIMESTAMP(timezone=False)},
+                    dtype={datetime_column: sq.types.TIMESTAMP(timezone=False)},
                 )
             else:
                 df.to_sql(

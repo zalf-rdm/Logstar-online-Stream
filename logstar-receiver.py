@@ -49,9 +49,11 @@ def main():
         action="store_true",
         help="activate continous downloading new released data on logstar-online for given stations",
     )
+
     parser.add_argument(
         "-i", "--interval", type=int, default=20, help="sampling interval in minutes"
     )
+
     parser.add_argument(
         "-m",
         "--sensor_mapping_file",
@@ -68,10 +70,19 @@ def main():
         default=15,
     )
 
+    parser.add_argument(
+        "--rename-datetime-column",
+        type=str,
+        dest="rename_datetime",
+        required=False,
+        default="Datetime",
+        help="change name of the Datetime column in the csv files or database tables",
+    )
+
     # csv
     parser.add_argument(
         "-co",
-        "--csv_outdir",
+        "--csv-outdir",
         type=str,
         required=False,
         default=None,
@@ -95,15 +106,17 @@ def main():
         action="store_true",
         help="force processings steps to work in ongoing mode, EXPERIMENTAL feature ...",
     )
+
     # db
     parser.add_argument(
         "-nodb",
-        "--disable_database",
+        "--disable-database",
         action="store_true",
         dest="disable_database",
         default=False,
         help="with -nodb set, results in no interaction with the database",
     )
+
     parser.add_argument(
         "-dbtp",
         "--db_table_prefix",
@@ -288,6 +301,7 @@ def main():
             "db_schema": db_schema,
             "db_table_prefix": db_table_prefix,
             "timeout": args.timeout,
+            "datetime_column": args.rename_datetime,
         }
 
         if args.ps_force:
@@ -307,7 +321,7 @@ def main():
             logging.warning("interrupted, program is going to shutdown ...")
 
     else:
-        # download data fro with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
+        # download data from api with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
         logstar.manage_dl_db(
             conf,
             database_engine,
@@ -317,6 +331,7 @@ def main():
             db_schema=db_schema,
             db_table_prefix=db_table_prefix,
             timeout=args.timeout,
+            datetime_column=args.rename_datetime,
         )
 
     if database_engine:
