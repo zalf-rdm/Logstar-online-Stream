@@ -29,19 +29,14 @@ class SimpleRenameColumnsPS(ProcessingStep):
         """
         super().__init__(kwargs)
 
-        if (
-            "equal" not in kwargs
-            or "columns" not in kwargs
-            or "seperator" not in kwargs
-        ):
+        if "equal" not in kwargs or "columns" not in kwargs or "seperator" not in kwargs:
             logging.error("columns or seperator missing in {}".format(self.ps_name))
-            logging.error(
-                'use like: python logstar-receiver.py  -nodb -co data/ -ps SimpleRenameColumnsPS columns="Luftfeuchte - \%rF:Luftfeuchte; " seperator=";Lufttemp1 - GradC:Lufttemp1" equal=":"'
-            )
+            logging.error("use like: python logstar-receiver.py  -nodb -co data/ -ps SimpleRenameColumnsPS columns=\"Luftfeuchte - \%rF:Luftfeuchte; \" seperator=\";Lufttemp1 - GradC:Lufttemp1\" equal=\":\"")
             sys.exit(1)
         self.equal = str(kwargs["equal"])
         self.columns = str(kwargs["columns"])
         self.seperator = str(kwargs["seperator"])
+
 
     def process(self, df: pd.DataFrame, station: str):
         """
@@ -61,11 +56,11 @@ class SimpleRenameColumnsPS(ProcessingStep):
         map = {}
         for s in columns:
             try:
-                k, v = s.split(self.equal)
-                map[k] = v
+              k,v = s.split(self.equal)
+              map[k] = v
             except:
-                logging.error("could not parse column: {}".format(s))
-        df.rename(columns=map, inplace=True)
+              logging.error("could not parse column: {}".format(s))
+        df.rename(columns=map,inplace=True)
 
         # logging.debug(
         #     f"running {self.ps_name} and only pass through following columns: {columns} ..."
