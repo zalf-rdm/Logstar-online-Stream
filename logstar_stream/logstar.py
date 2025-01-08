@@ -49,8 +49,6 @@ def do_sensor_mapping(station, mapping):
 
 
 FIELDS_TO_IGNORE = ["date", "time"]
-
-
 def do_column_name_mapping(sensor_name, header, mapping):
     """
     Maps column names in the header based on a sensor name and a mapping dictionary.
@@ -210,7 +208,13 @@ def manage_dl_db(
 
         # rename table column names, or csv column names
         if sensor_mapping:
+<<<<<<< HEAD
             ret = do_column_name_mapping(name, data["header"], sensor_mapping)
+=======
+            ret = do_column_name_mapping(
+                name, data["header"], sensor_mapping
+            )
+>>>>>>> a08578940ef68881bd51f738d27c9caae6f9b80d
             data["header"] = ret if ret is not None else data["header"]
 
         # build pandas df from data
