@@ -49,8 +49,6 @@ def do_sensor_mapping(station, mapping):
 
 
 FIELDS_TO_IGNORE = ["date", "time"]
-
-
 def do_column_name_mapping(sensor_name, header, mapping):
     """
     Maps column names in the header based on a sensor name and a mapping dictionary.
@@ -76,47 +74,49 @@ def do_column_name_mapping(sensor_name, header, mapping):
 
     measurement_class_name = mapping["sensor-mapping"][sensor_name]["measurement-class"]
     measurement_class = mapping["measurement-classes"][measurement_class_name]
-    pattern = re.compile(measurement_class["regex"])
+    if "regex" in measurement_class:
+        pattern = re.compile(measurement_class["regex"])
 
-    new_header = {}
-    for k, c_name_remote in header.items():
-        if c_name_remote in FIELDS_TO_IGNORE:
-            new_header[k] = c_name_remote
-            continue
-        for name, value in measurement_class["mapping"].items():
-            if value["abbreviation"] in c_name_remote:
-                if (
-                    "only_includes_abbreviation" in value
-                    and value["only_includes_abbreviation"]
-                ):
-                    new_header[k] = c_name = name
-                    continue
+        new_header = {}
+        for k, c_name_remote in header.items():
+            if c_name_remote in FIELDS_TO_IGNORE:
+                new_header[k] = c_name_remote
+                continue
+            for name, value in measurement_class["mapping"].items():
+                if value["abbreviation"] in c_name_remote:
+                    if (
+                        "only_includes_abbreviation" in value
+                        and value["only_includes_abbreviation"]
+                    ):
+                        new_header[k] = c_name = name
+                        continue
 
-                r = pattern.match(c_name_remote)
+                    r = pattern.match(c_name_remote)
 
-                # c_name_remote can differ a lot, the design of this names is not properly choosen by UP GmbH
-                # worst case is weather data which supports 3 different pattern:
+                    # c_name_remote can differ a lot, the design of this names is not properly choosen by UP GmbH
+                    # worst case is weather data which supports 3 different pattern:
 
-                # case 1: "WS1_LT_3 - °C
-                if r["number"] is not None:
-                    c_name = "{}_{}_{}_cm".format(
-                        name,
-                        measurement_class["position"][r["number"]]["side"],
-                        measurement_class["position"][r["number"]]["depth"],
-                    )
-                # case 2 "WS1_WG_x - m/s"
-                elif r["number"] is None and r["string"] is not None:
-                    c_name = "{}_{}".format(
-                        name,
-                        r["string"],
-                    )
-                # case 3 "WS1_WR - grad"
-                elif r["number"] is None and r["string"] is None:
-                    c_name = "{}".format(
-                        name,
-                    )
-                new_header[k] = c_name
-    return new_header
+                    # case 1: "WS1_LT_3 - °C
+                    if r["number"] is not None:
+                        c_name = "{}_{}_{}_cm".format(
+                            name,
+                            measurement_class["position"][r["number"]]["side"],
+                            measurement_class["position"][r["number"]]["depth"],
+                        )
+                    # case 2 "WS1_WG_x - m/s"
+                    elif r["number"] is None and r["string"] is not None:
+                        c_name = "{}_{}".format(
+                            name,
+                            r["string"],
+                        )
+                    # case 3 "WS1_WR - grad"
+                    elif r["number"] is None and r["string"] is None:
+                        c_name = "{}".format(
+                            name,
+                        )
+                    new_header[k] = c_name
+        return new_header
+    return None
 
 
 def request_data(url, timeout):
@@ -206,10 +206,11 @@ def manage_dl_db(
             continue
 
         # rename table column names, or csv column names
-        if sensor_mapping is not None:
-            data["header"] = do_column_name_mapping(
+        if sensor_mapping:
+            ret = do_column_name_mapping(
                 name, data["header"], sensor_mapping
             )
+            data["header"] = ret if ret is not None else data["header"]
 
         # build pandas df from data
         df = pd.DataFrame(data["data"])
