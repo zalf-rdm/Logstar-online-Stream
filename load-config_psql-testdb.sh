@@ -11,7 +11,7 @@ export LOGSTAR_STATIONS=""
 # database conf
 export LOGSTAR_DB_USER="postgres"
 export LOGSTAR_DB_PASS="postgres"
-export LOGSTAR_DB="logstar"
+export LOGSTAR_DB_DBNAME="logstar"
 export LOGSTAR_DB_HOST="localhost"
 export LOGSTAR_DB_DRIVER="PostgreSQL"
 export LOGSTAR_DB_PORT="5432"

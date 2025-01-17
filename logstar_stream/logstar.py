@@ -7,6 +7,9 @@ import csv
 from typing import List
 
 import sqlalchemy as sq
+# only works for PostgreSQL
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.inspection import inspect
 import pandas as pd
 
 """
@@ -14,6 +17,59 @@ import pandas as pd
 	http://dokuwiki.weather-station-data.com/doku.php?id=:en:start
 """
 LOGSTAR_API_URL = "https://logstar-online.de/api"
+
+
+# PostgreSQL interaction
+# ref: https://stackoverflow.com/questions/30337394/pandas-to-sql-fails-on-duplicate-primary-key
+def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
+    """
+    Insert all records from data_iter into table. If a record already exists (as determined by the primary keys), do nothing.
+
+    :param table: the sqlalchemy table to insert into
+    :type table: sqlalchemy.sql.schema.Table
+    :param conn: the sqlalchemy connection to use
+    :type conn: sqlalchemy.engine.Connection
+    :param keys: the keys to use for determining uniqueness
+    :type keys: List[str]
+    :param data_iter: the data to insert
+    :type data_iter: iterator over dictionaries
+    """
+    insert_stmt = insert(table.table).values(list(data_iter))
+    on_duplicate_key_stmt = insert_stmt.on_conflict_do_nothing()
+    conn.execute(on_duplicate_key_stmt)
+
+
+# ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
+def create_table(self, frame, name, if_exists='fail', index=True,
+          index_label=None, schema=None, chunksize=None, dtype=None, **kwargs):
+    """
+    Creates a SQL table using the provided DataFrame and SQLAlchemy engine.
+
+    Args:
+        frame (DataFrame): The pandas DataFrame to be converted into a SQL table.
+        name (str): The name of the SQL table to be created.
+        if_exists (str, optional): What to do if the table already exists. Options are 'fail', 'replace', or 'append'. Defaults to 'fail'.
+        index (bool, optional): Whether to include the DataFrame's index as a column in the table. Defaults to True.
+        index_label (str or sequence, optional): Column label for the index column(s). If None is given (default) and index is True, the index names are used.
+        schema (str, optional): The schema to create the table under. Defaults to None.
+        chunksize (int, optional): If not None, then rows will be written in batches of this size. Defaults to None.
+        dtype (dict, optional): Specifying the datatype for columns. If None, the data type will be inferred. Defaults to None.
+        **kwargs: Additional arguments to pass to the SQLTable constructor.
+
+    Raises:
+        ValueError: If the specified dtype is not a valid SQLAlchemy type.
+    """
+
+    if dtype is not None:
+        from sqlalchemy.types import to_instance, TypeEngine
+        for col, my_type in dtype.items():
+            if not isinstance(to_instance(my_type), TypeEngine):
+                raise ValueError('The type of %s is not a SQLAlchemy '
+                                'type ' % col)
+    table = pd.io.sql.SQLTable(name, self, frame=frame, index=index,
+                    if_exists=if_exists, index_label=index_label,
+                    schema=schema, dtype=dtype, **kwargs)
+    table.create()
 
 
 def build_url(conf, station, channel=0):
@@ -244,24 +300,34 @@ def manage_dl_db(
 
         if database_engine:
             table_name = db_table_prefix + name
-            logging.info("writing {} to database ...".format(table_name))
-            if "Datetime" in cols:
-                df.to_sql(
-                    table_name,
-                    con=database_engine,
-                    schema=db_schema,
-                    if_exists="append",
-                    index=False,
-                    dtype={datetime_column: sq.types.TIMESTAMP(timezone=False)},
-                )
+           
+            if not inspect(database_engine).has_table(table_name):
+                logging.info(f"creating database table {table_name} with primary key on {datetime_column} ...")
+                pandas_sql = pd.io.sql.pandasSQL_builder(database_engine, schema=db_schema)
+                create_table(pandas_sql, df, table_name,
+                        index=None, index_label=None, dtype={datetime_column: sq.types.TIMESTAMP(timezone=False)}, keys=datetime_column, if_exists='replace')          
+
             else:
-                df.to_sql(
-                    table_name,
-                    con=database_engine,
-                    schema=db_schema,
-                    if_exists="append",
-                    index=False,
-                )
+                contrains = inspect(database_engine).get_pk_constraint(table_name=table_name, schema=db_schema)
+                if not "constrained_columns" in contrains or datetime_column not in contrains["constrained_columns"]:
+                    logging.error(f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ...")
+
+            logging.info("writing {} to database ...".format(table_name))
+            to_sql_arugments = {
+                "name": table_name,
+                "con": database_engine,
+                "schema": db_schema,
+                "if_exists": 'append',
+                "index": False,
+                "chunksize": 4096,
+                "method": insert_or_do_nothing_on_conflict
+            }
+
+            try:
+                df.to_sql(**to_sql_arugments)
+            except Exception as E:
+                logging.error(f"could not write data to table: {table_name} ...")
+                logging.error(E)
 
         # write to file
         if csv_folder:
