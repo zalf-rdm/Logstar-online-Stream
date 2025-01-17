@@ -301,7 +301,7 @@ def manage_dl_db(
         if database_engine:
             table_name = db_table_prefix + name
            
-            if not inspect(database_engine).has_table(table_name):
+            if not inspect(database_engine).has_table(table_name=table_name, schema=db_schema):
                 logging.info(f"creating database table {table_name} with primary key on {datetime_column} ...")
                 pandas_sql = pd.io.sql.pandasSQL_builder(database_engine, schema=db_schema)
                 create_table(pandas_sql, df, table_name,
@@ -325,6 +325,7 @@ def manage_dl_db(
 
             try:
                 df.to_sql(**to_sql_arugments)
+                logging.info("done writing ...")
             except Exception as E:
                 logging.error(f"could not write data to table: {table_name} ...")
                 logging.error(E)
