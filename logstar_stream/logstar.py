@@ -4,13 +4,14 @@ import logging
 import json
 import os
 import csv
-from typing import List
+from typing import List, Dict
+import pandas as pd
 
 import sqlalchemy as sq
+
 # only works for PostgreSQL
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.inspection import inspect
-import pandas as pd
 
 """
 	API DOCs
@@ -40,8 +41,18 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
 
 
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
-def create_table(self, frame, name, if_exists='fail', index=True,
-          index_label=None, schema=None, chunksize=None, dtype=None, **kwargs):
+def create_table(
+    self,
+    frame,
+    name,
+    if_exists="fail",
+    index=True,
+    index_label=None,
+    schema=None,
+    chunksize=None,
+    dtype=None,
+    **kwargs,
+):
     """
     Creates a SQL table using the provided DataFrame and SQLAlchemy engine.
 
@@ -62,13 +73,22 @@ def create_table(self, frame, name, if_exists='fail', index=True,
 
     if dtype is not None:
         from sqlalchemy.types import to_instance, TypeEngine
+
+        # check provided types
         for col, my_type in dtype.items():
             if not isinstance(to_instance(my_type), TypeEngine):
-                raise ValueError('The type of %s is not a SQLAlchemy '
-                                'type ' % col)
-    table = pd.io.sql.SQLTable(name, self, frame=frame, index=index,
-                    if_exists=if_exists, index_label=index_label,
-                    schema=schema, dtype=dtype, **kwargs)
+                raise ValueError("The type of %s is not a SQLAlchemy " "type " % col)
+    table = pd.io.sql.SQLTable(
+        name,
+        self,
+        frame=frame,
+        index=index,
+        if_exists=if_exists,
+        index_label=index_label,
+        schema=schema,
+        dtype=dtype,
+        **kwargs,
+    )
     table.create()
 
 
@@ -105,6 +125,8 @@ def do_sensor_mapping(station, mapping):
 
 
 FIELDS_TO_IGNORE = ["date", "time"]
+
+
 def do_column_name_mapping(sensor_name, header, mapping):
     """
     Maps column names in the header based on a sensor name and a mapping dictionary.
@@ -221,6 +243,94 @@ def download_data(conf, station, timeout=15):
         return None
 
 
+def prepare_dataframe(data: Dict, datetime_column: str) -> pd.DataFrame:
+    # build pandas df from data
+    df = pd.DataFrame(data["data"])
+    df = df.rename(columns=data["header"])
+
+    cols = df.columns.tolist()
+    # depending on LOGSTAR_DAYTIME="0"
+    # making datetime occure in beginning
+    if "Datetime" in cols:
+        cols.insert(0, cols.pop(cols.index("Datetime")))
+        df = df[cols]
+        df = df.rename(columns={"dateTime": datetime_column})
+        df[datetime_column] = pd.to_datetime(df[datetime_column], errors="raise")
+        cols.remove(datetime_column)
+
+    # may buggy
+    elif "Date" in cols and "Time" in cols:
+        # making date and time occure in beginning
+        cols.insert(0, cols.pop(cols.index("Date")))
+        cols.insert(0, cols.pop(cols.index("Time")))
+        df = df[cols]
+
+        # clean cols for dtype optimization
+        cols.remove("Date")
+        cols.remove("Time")
+
+    # replace # to be Nan , hashes are comming from UP as no-value
+    df.replace("#", pd.NA, inplace=True)
+
+    # update col type to numeric after replacing # value
+    for col in cols:
+        df[col] = pd.to_numeric(df[col], errors="raise")
+    return df
+
+
+def write_to_database(
+    name, df, database_engine, db_schema, db_table_prefix, datetime_column, **kwargs
+):
+    table_name = db_table_prefix + name
+
+    if not inspect(database_engine).has_table(table_name=table_name, schema=db_schema):
+        logging.info(
+            f"creating database table {table_name} with primary key on {datetime_column} ..."
+        )
+        pandas_sql = pd.io.sql.pandasSQL_builder(database_engine, schema=db_schema)
+
+        # create table with constrains
+        create_table(
+            pandas_sql,
+            df,
+            table_name,
+            index=None,
+            index_label=None,
+            keys=datetime_column,
+            if_exists="replace",
+        )
+
+    else:
+        contrains = inspect(database_engine).get_pk_constraint(
+            table_name=table_name, schema=db_schema
+        )
+        if (
+            not "constrained_columns" in contrains
+            or datetime_column not in contrains["constrained_columns"]
+        ):
+            logging.error(
+                f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ..."
+            )
+
+    to_sql_arugments = {
+        "name": table_name,
+        "con": database_engine,
+        "schema": db_schema,
+        "if_exists": "append",
+        "index": False,
+        "chunksize": 4096,
+        "method": insert_or_do_nothing_on_conflict,
+    }
+
+    try:
+        logging.info(f"writing {table_name} to database ...")
+        df.to_sql(**to_sql_arugments)
+        logging.info(f"succesfully writing data ...")
+    except Exception as E:
+        logging.error(f"failed writing data ...")
+        logging.error(E)
+
+
 def manage_dl_db(
     conf,
     database_engine=None,
@@ -231,6 +341,7 @@ def manage_dl_db(
     db_table_prefix=None,
     datetime_column="Datetime",
     timeout=15,
+    **kwargs,
 ):
     """
     main routine to download data and save it to database and|or csv
@@ -243,18 +354,17 @@ def manage_dl_db(
     :param db_schema
     :param db_table_prefix
     """
+
     ret_data = {}
     for station in conf["stationlist"]:
         name = station
-        # rename station if sensor_mapping available
-        if sensor_mapping:
-            name = do_sensor_mapping(station, sensor_mapping)
+
+        # download data
         logging.info(
             "downloading data for station {} from {} to {} ...".format(
                 name, conf["startdate"], conf["enddate"]
             )
         )
-        # download data
         data = download_data(conf, station, timeout)
 
         # no new data or something went wrong while downloading the data
@@ -264,71 +374,35 @@ def manage_dl_db(
 
         # rename table column names, or csv column names
         if sensor_mapping:
-            ret = do_column_name_mapping(
+            mapping_return = do_column_name_mapping(
                 name, data["header"], sensor_mapping
             )
-            data["header"] = ret if ret is not None else data["header"]
 
-        # build pandas df from data
-        df = pd.DataFrame(data["data"])
-        df = df.rename(columns=data["header"])
+            # update columns names if mapping_return is not None
+            data["header"] = (
+                mapping_return if mapping_return is not None else data["header"]
+            )
+            # rename station if sensor_mapping available
+            name = do_sensor_mapping(station, sensor_mapping)
 
-        # Force dateTime always like Datetime
-        df.rename(columns={"dateTime": "Datetime"}, inplace=True)
-
-        cols = df.columns.tolist()
-        # depending on LOGSTAR_DAYTIME="0"
-        # making datetime occure in beginning
-        if "Datetime" in cols:
-            cols.insert(0, cols.pop(cols.index("Datetime")))
-            df = df[cols]
-
-        elif "Date" in cols and "Time" in cols:
-            # making date and time occure in beginning
-            cols.insert(0, cols.pop(cols.index("Date")))
-            cols.insert(0, cols.pop(cols.index("Time")))
-            df = df[cols]
+        # get downloaded data as dataframe
+        df = prepare_dataframe(data, datetime_column)
 
         # give data to process
         if processing_steps is not None:
             [df := ps.process(df, name) for ps in processing_steps]
 
+        # check if dataframe is not empty
         if df is None or df.empty:
+            logging.warning(f"empty dataframe for station {name}")
+            ret_data[name] = df
             continue
-        
-        df = df.rename(columns={"Datetime": datetime_column})
 
+        # if database engine is set, write to database
         if database_engine:
-            table_name = db_table_prefix + name
-           
-            if not inspect(database_engine).has_table(table_name=table_name, schema=db_schema):
-                logging.info(f"creating database table {table_name} with primary key on {datetime_column} ...")
-                pandas_sql = pd.io.sql.pandasSQL_builder(database_engine, schema=db_schema)
-                create_table(pandas_sql, df, table_name,
-                        index=None, index_label=None, dtype={datetime_column: sq.types.TIMESTAMP(timezone=False)}, keys=datetime_column, if_exists='replace')          
-
-            else:
-                contrains = inspect(database_engine).get_pk_constraint(table_name=table_name, schema=db_schema)
-                if not "constrained_columns" in contrains or datetime_column not in contrains["constrained_columns"]:
-                    logging.error(f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ...")
-
-            logging.info("writing {} to database ...".format(table_name))
-            to_sql_arugments = {
-                "name": table_name,
-                "con": database_engine,
-                "schema": db_schema,
-                "if_exists": 'append',
-                "index": False,
-                "chunksize": 4096,
-                "method": insert_or_do_nothing_on_conflict
-            }
-
-            try:
-                df.to_sql(**to_sql_arugments)
-                logging.info("done writing ...")
-            except Exception as E:
-                logging.error(f"could not write data to table: {table_name} ...")
-                logging.error(E)
+            write_to_database(
+                name, df, database_engine, db_schema, db_table_prefix, datetime_column
+            )
 
         # write to file
         if csv_folder:
@@ -343,5 +417,7 @@ def manage_dl_db(
                 quoting=csv.QUOTE_MINIMAL,
                 index=False,
             )
+
+        # add df to return data collection
         ret_data[name] = df
     return ret_data
