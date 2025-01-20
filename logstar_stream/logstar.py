@@ -126,6 +126,11 @@ def do_sensor_mapping(station, mapping):
 
 FIELDS_TO_IGNORE = ["date", "time"]
 
+def __find_sensor_mapping__(sensor_name, mapping):
+    for key, value in mapping["sensor-mapping"].items():
+        if sensor_name in value["values"]:
+          return key
+    return False
 
 def do_column_name_mapping(sensor_name, header, mapping):
     """
@@ -139,10 +144,8 @@ def do_column_name_mapping(sensor_name, header, mapping):
     Returns:
         dict: A new header dictionary with mapped column names.
     """
-    if (
-        sensor_name not in mapping["sensor-mapping"]
-        or not mapping["sensor-mapping"][sensor_name]
-    ):
+    mapping_name = __find_sensor_mapping__(sensor_name,mapping)
+    if not mapping_name:
         logging.info(
             "could not provide measurement mapping for sensor {}, not found ...".format(
                 sensor_name
@@ -150,7 +153,7 @@ def do_column_name_mapping(sensor_name, header, mapping):
         )
         return header
 
-    measurement_class_name = mapping["sensor-mapping"][sensor_name]["measurement-class"]
+    measurement_class_name = mapping["sensor-mapping"][mapping_name]["measurement-class"]
     measurement_class = mapping["measurement-classes"][measurement_class_name]
     if "regex" in measurement_class:
         pattern = re.compile(measurement_class["regex"])
@@ -248,14 +251,15 @@ def prepare_dataframe(data: Dict, datetime_column: str) -> pd.DataFrame:
     df = pd.DataFrame(data["data"])
     df = df.rename(columns=data["header"])
 
-    cols = df.columns.tolist()
     # depending on LOGSTAR_DAYTIME="0"
     # making datetime occure in beginning
-    if "Datetime" in cols:
-        cols.insert(0, cols.pop(cols.index("Datetime")))
-        df = df[cols]
-        df = df.rename(columns={"dateTime": datetime_column})
+    if "dateTime" in df.columns.tolist():
+        df.rename(columns={"dateTime": datetime_column}, inplace=True)
+        cols = df.columns.tolist()
         df[datetime_column] = pd.to_datetime(df[datetime_column], errors="raise")
+        cols.insert(0, cols.pop(cols.index(datetime_column)))
+        df = df[cols]
+        
         cols.remove(datetime_column)
 
     # may buggy
@@ -263,6 +267,7 @@ def prepare_dataframe(data: Dict, datetime_column: str) -> pd.DataFrame:
         # making date and time occure in beginning
         cols.insert(0, cols.pop(cols.index("Date")))
         cols.insert(0, cols.pop(cols.index("Time")))
+        cols = df.columns.tolist()
         df = df[cols]
 
         # clean cols for dtype optimization
@@ -271,7 +276,6 @@ def prepare_dataframe(data: Dict, datetime_column: str) -> pd.DataFrame:
 
     # replace # to be Nan , hashes are comming from UP as no-value
     df.replace("#", pd.NA, inplace=True)
-
     # update col type to numeric after replacing # value
     for col in cols:
         df[col] = pd.to_numeric(df[col], errors="raise")
