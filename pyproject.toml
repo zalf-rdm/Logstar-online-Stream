@@ -16,8 +16,8 @@ dependencies = [
     "requests==2.32.3",
     "sqlalchemy==1.4.39",
     "pandas==1.4.3",
-    "numpy==1.26.4"
-
+    "numpy==1.26.4",
+    "psycopg2-binary==2.9.10"
 ]
 [project.urls]
 repository = "https://github.com/zalf-rdm/Logstar-online-Stream/"
