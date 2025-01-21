@@ -105,7 +105,7 @@ def build_url(conf, station, channel=0):
     return url
 
 
-def do_sensor_mapping(station, mapping):
+def do_station_name_mapping(station, mapping):
     """
     get readable name for given station from mapping
 
@@ -124,7 +124,7 @@ def do_sensor_mapping(station, mapping):
     return station
 
 
-FIELDS_TO_IGNORE = ["date", "time"]
+FIELDS_TO_IGNORE = ["date", "time", "Datetime"]
 
 
 def do_column_name_mapping(sensor_name, header, mapping):
@@ -251,11 +251,17 @@ def prepare_dataframe(data: Dict, datetime_column: str) -> pd.DataFrame:
     cols = df.columns.tolist()
     # depending on LOGSTAR_DAYTIME="0"
     # making datetime occure in beginning
-    if "Datetime" in cols:
-        cols.insert(0, cols.pop(cols.index("Datetime")))
-        df = df[cols]
-        df = df.rename(columns={"dateTime": datetime_column})
+    if "Datetime" in df.columns.tolist():
+        df.rename(columns={"Datetime": datetime_column}, inplace=True)
+        cols = df.columns.tolist()
+
+        # set datetime column astype datetime
         df[datetime_column] = pd.to_datetime(df[datetime_column], errors="raise")
+
+        # force datetime column to be on first position
+        cols.insert(0, cols.pop(cols.index(datetime_column)))
+        df = df[cols]
+
         cols.remove(datetime_column)
 
     # may buggy
@@ -354,7 +360,6 @@ def manage_dl_db(
     :param db_schema
     :param db_table_prefix
     """
-
     ret_data = {}
     for station in conf["stationlist"]:
         name = station
@@ -366,7 +371,6 @@ def manage_dl_db(
             )
         )
         data = download_data(conf, station, timeout)
-
         # no new data or something went wrong while downloading the data
         if data is None or "data" not in data:
             logging.error(f"could not download data for station {name}\n {data}")
@@ -383,7 +387,7 @@ def manage_dl_db(
                 mapping_return if mapping_return is not None else data["header"]
             )
             # rename station if sensor_mapping available
-            name = do_sensor_mapping(station, sensor_mapping)
+            name = do_station_name_mapping(station, sensor_mapping)
 
         # get downloaded data as dataframe
         df = prepare_dataframe(data, datetime_column)
