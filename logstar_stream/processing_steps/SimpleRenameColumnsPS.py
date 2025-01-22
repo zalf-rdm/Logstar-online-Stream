@@ -67,18 +67,4 @@ class SimpleRenameColumnsPS(ProcessingStep):
                 logging.error("could not parse column: {}".format(s))
         df.rename(columns=map, inplace=True)
 
-        # logging.debug(
-        #     f"running {self.ps_name} and only pass through following columns: {columns} ..."
-        # )
-
-        # # check if all required fields are available
-        # all_requested_columns_available = set(columnsself.s).issubset(df.columns)
-        # if not all_requested_columns_available:
-        #     logging.debug(
-        #         f"did not found all required columns in {station} to run {self.ps_name}"
-        #     )
-        #     return pd.DataFrame()
-
-        # df = df[df.columns.intersection(columns, sort=False)]
-
         return df

@@ -43,13 +43,13 @@ class JumpCheckPS(ProcessingStep):
     ]
 
     # value to fill if missmeasurement detected
-    ERROR_VALUE = float("NaN")
+    ERROR_VALUE = pd.NA
 
     # maximum duration of a jump, if it takes longer than this the data will not be deleted in messurement
-    MAXIMUM_JUMP_DURATION = 10
+    MAXIMUM_JUMP_DURATION = 10.0
 
     # jump difference between two following values
-    MINIMUM_JUMP_DIFFER_VALUE = 5
+    MINIMUM_JUMP_DIFFER_VALUE = 5.0
 
     def __init__(self, kwargs):
         super().__init__(kwargs)
@@ -113,9 +113,13 @@ class JumpCheckPS(ProcessingStep):
                 current_value = row[column]
 
                 # check if current_value is nan
-                if current_value is None or math.isnan(current_value):
+                if current_value is None or pd.isnull(current_value):
                     self.reset_counters(station_messurement_env)
-                    station_messurement_env.last_value = float("NaN")
+                    station_messurement_env.last_value = pd.NA
+                    continue
+
+                if pd.isnull(station_messurement_env.last_value):
+                    station_messurement_env.last_value = current_value
                     continue
 
                 # Jump Down

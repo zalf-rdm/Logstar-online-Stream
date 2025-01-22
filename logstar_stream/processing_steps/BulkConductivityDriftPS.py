@@ -11,7 +11,7 @@ class BulkConductivityDriftPS(ProcessingStep):
     ps_description = "TODO"
 
     # value to fill if missmeasurement detected
-    ERROR_VALUE = float("NaN")
+    ERROR_VALUE = pd.NA
 
     FORBIDDEN_VALUES = [{"value": 0, "duration": 100}]
 
@@ -58,7 +58,7 @@ class BulkConductivityDriftPS(ProcessingStep):
             left_del = False
             right_del = False
 
-            if math.isnan(left_value):
+            if pd.isnull(left_value):
                 pass
             # compare diff between left and right side. If left or right higher than treshold_left_to_right + (left or right) remove the other
             elif (
@@ -68,7 +68,7 @@ class BulkConductivityDriftPS(ProcessingStep):
                 left_del = True
                 self.to_change.append((int(row_num), self.ELEMENT_ORDER_LEFT[i]))
 
-            if math.isnan(right_value):
+            if pd.isnull(right_value):
                 pass
             elif (
                 right_value - left_value > self.treshold_left_to_right
@@ -88,8 +88,8 @@ class BulkConductivityDriftPS(ProcessingStep):
             # check if nan or none is on left side
             if (
                 None in (left_value, left_lower_value)
-                or math.isnan(left_value)
-                or math.isnan(left_lower_value)
+                or pd.isnull(left_value)
+                or pd.isnull(left_lower_value)
             ):
                 pass
 
@@ -101,8 +101,8 @@ class BulkConductivityDriftPS(ProcessingStep):
 
             if (
                 None in (right_value, right_lower_value)
-                or math.isnan(right_value)
-                or math.isnan(right_lower_value)
+                or pd.isnull(right_value)
+                or pd.isnull(right_lower_value)
             ):
                 pass
 
