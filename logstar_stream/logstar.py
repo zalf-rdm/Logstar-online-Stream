@@ -2,11 +2,12 @@ import requests
 import re
 import logging
 import json
-import os
-import csv
 from typing import List
-
+import time
 import pandas as pd
+
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 
 """
 	API DOCs
@@ -182,14 +183,11 @@ def download_data(conf, station):
     return json.loads(request)
 
 
-def manage_dl_db(
+def download_station_data(
     conf,
-    database_engine=None,
+    station=str,
     processing_steps: List = [],
     sensor_mapping=None,
-    csv_folder=None,
-    db_schema=None,
-    db_table_prefix=None,
 ):
     """
     main routine to download data and save it to database and|or csv
@@ -202,37 +200,101 @@ def manage_dl_db(
     :param db_schema
     :param db_table_prefix
     """
-    ret_data = {}
-    for station in conf["stationlist"]:
-        name = station
-        # rename station if sensor_mapping available
-        if sensor_mapping:
-            name = do_sensor_mapping(station, sensor_mapping)
-        logging.info(
-            "downloading data for station {} from {} to {} ...".format(
-                name, conf["startdate"], conf["enddate"]
-            )
+    name = station
+    # rename station if sensor_mapping available
+    if sensor_mapping:
+        name = do_sensor_mapping(station, sensor_mapping)
+    logging.info(
+        "downloading data for station {} from {} to {} ...".format(
+            name, conf["startdate"], conf["enddate"]
         )
+    )
 
+<<<<<<< Updated upstream
         # download data
         data = download_data(conf, station)
         if data is None:
             # no new data or something went wrong while downloading the data
             continue
+=======
+    # download data
+    data = download_data(conf, station)
 
-        # rename table column names, or csv column names
-        if sensor_mapping is not None:
-            data["header"] = do_column_name_mapping(
-                name, data["header"], sensor_mapping
+    # no new data or something went wrong while downloading the data
+    if data is None or "data" not in data:
+        logging.error(f"could not download data for station {name}\n {data}")
+        return None
+>>>>>>> Stashed changes
+
+    # rename table column names, or csv column names
+    if sensor_mapping is not None:
+        data["header"] = do_column_name_mapping(
+            name, data["header"], sensor_mapping
+        )
+    # build pandas df from data
+    df = pd.DataFrame(data["data"])
+    # making date and time occure in beginning
+    cols = df.columns.tolist()
+    cols = cols[-2:] + cols[:-2]
+    df = df[cols]
+    df = df.rename(columns=data["header"])
+
+    # give data to process
+    if processing_steps is not None:
+        [df := ps.process(df, name) for ps in processing_steps]
+
+    if df is None or df.empty:
+        logging.error(f"no data for station {name} ...")
+        return None
+
+    return df
+
+
+DB_RECONNECT_TIMEOUT = 3  # time in between reconnect attempts
+
+def init_database(conf,):
+        # test database connection
+    if conf["db_driver"] == "PostgreSQL":
+        connection_url = URL.create(
+            "postgresql",
+            username=conf["db_username"],
+            password=conf["db_password"],
+            host=conf["db_host"],
+            port=conf["db_port"],
+            database=conf["db_database"],
+        )
+        database_engine = create_engine(connection_url)
+
+    elif conf["db_driver"] == "ODBC Driver 17 for SQL Server":
+        connection_url = URL.create(
+            "mssql+pyodbc",
+            username=conf["db_username"],
+            password=conf["db_password"],
+            host=conf["db_host"],
+            port=conf["db_port"],
+            database=conf["db_database"],
+            query={
+                "driver": conf["db_driver"],
+                "authentication": "ActiveDirectoryIntegrated",
+            },
+        )
+    else:
+        return None
+            # try connect to database
+    i = 0
+    while True:
+        database_engine = create_engine(connection_url)
+        if not database_engine:
+            logging.error(
+                "Could not connect to database, retry number {} ...".format(i)
             )
-        # build pandas df from data
-        df = pd.DataFrame(data["data"])
-        # making date and time occure in beginning
-        cols = df.columns.tolist()
-        cols = cols[-2:] + cols[:-2]
-        df = df[cols]
-        df = df.rename(columns=data["header"])
+            i += 1
+            time.sleep(DB_RECONNECT_TIMEOUT)
+        else:
+            break
+    return database_engine
 
+<<<<<<< Updated upstream
         # give data to process
         if processing_steps is not None:
             [df := ps.process(df, name) for ps in processing_steps]
@@ -262,3 +324,11 @@ def manage_dl_db(
             )
         ret_data[name] = df
     return ret_data
+=======
+def write_to_db(df, station, database_engine, db_schema, db_table_prefix=""):
+        table_name = db_table_prefix + station
+        logging.info("writing {} to database ...".format(table_name))
+        df.to_sql(
+            table_name, con=database_engine, schema=db_schema, if_exists="append"
+        )
+>>>>>>> Stashed changes

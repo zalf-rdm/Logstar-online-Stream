@@ -5,16 +5,13 @@ import logging
 import json
 import sys
 import os
+import csv
 import datetime
 import time
-
-from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
 
 import logstar_stream.logstar as logstar
 import logstar_stream.processing_steps.ProcessingStep as ps
 
-DB_RECONNECT_TIMEOUT = 3  # time in between reconnect attempts
 
 DEFAULT_DB_SCHEMA = "public"
 
@@ -69,6 +66,17 @@ def main():
         default=None,
         dest="csv_outfolder",
         help="path to the folder where csv file are stored, if set",
+    )
+
+    # geojson
+    parser.add_argument(
+        "-geo",
+        "--geo_outdir",
+        type=str,
+        required=False,
+        default=None,
+        dest="geo_outfolder",
+        help="path to the folder where geo file are stored, if set",
     )
 
     # plugins
@@ -141,7 +149,7 @@ def main():
     conf = {
         "apikey": os.environ.get("LOGSTAR_APIKEY"),
         "stations": os.environ.get("LOGSTAR_STATIONS"),
-        "geodata": os.environ.get("LOGSTAR_GEODATA", True),
+        # "geodata": os.environ.get("LOGSTAR_GEODATA", True),
         "datetime": os.environ.get("LOGSTAR_DAYTIME", 0),
         "startdate": os.environ.get("LOGSTAR_STARTDATE", "2021-01-01"),
         "enddate": os.environ.get("LOGSTAR_ENDDATE", "2021-05-02"),
@@ -200,52 +208,14 @@ def main():
     database_engine = None
     # skip database driver evaluation if -nodb set
     if not args.disable_database:
-        # test database connection
-        if conf["db_driver"] == "PostgreSQL":
-            connection_url = URL.create(
-                "postgresql",
-                username=conf["db_username"],
-                password=conf["db_password"],
-                host=conf["db_host"],
-                port=conf["db_port"],
-                database=conf["db_database"],
-            )
-            database_engine = create_engine(connection_url)
-
-        elif conf["db_driver"] == "ODBC Driver 17 for SQL Server":
-            connection_url = URL.create(
-                "mssql+pyodbc",
-                username=conf["db_username"],
-                password=conf["db_password"],
-                host=conf["db_host"],
-                port=conf["db_port"],
-                database=conf["db_database"],
-                query={
-                    "driver": conf["db_driver"],
-                    "authentication": "ActiveDirectoryIntegrated",
-                },
-            )
-
-        else:
+        database_engine = logstar.init_database(conf=conf)
+        if database_engine is None:
             logging.error(
-                'provided "db_driver": "{}"  unknown, logstar only supports "PostgreSQL" and "ODBC Driver 17 for SQL Server"...'.format(
-                    conf["db_driver"]
-                )
+            'provided "db_driver": "{}"  unknown, logstar only supports "PostgreSQL" and "ODBC Driver 17 for SQL Server"...'.format(
+                conf["db_driver"])
             )
             sys.exit(1)
 
-        # try connect to database
-        i = 0
-        while True:
-            database_engine = create_engine(connection_url)
-            if not database_engine:
-                logging.error(
-                    "Could not connect to database, retry number {} ...".format(i)
-                )
-                i += 1
-                time.sleep(DB_RECONNECT_TIMEOUT)
-            else:
-                break
 
     # if ongoing is set logstar constantly looks for new data
     if args.ongoing:
@@ -265,27 +235,66 @@ def main():
                 tomorrow = today + datetime.timedelta(days=1)
                 conf["startdate"] = today.strftime("%Y-%m-%d")  # %H:%M:%S
                 conf["enddate"] = tomorrow.strftime("%Y-%m-%d")
-                logstar.manage_dl_db(
-                    conf,
-                    database_engine,
-                    sensor_mapping=sensor_mapping,
-                    db_schema=db_schema,
-                    db_table_prefix=db_table_prefix,
-                )
+                for station in conf["stationlist"]:
+                    df = logstar.download_station_data(
+                        conf=conf,
+                        station=station,
+                        processing_steps=processing_steps,
+                        sensor_mapping=sensor_mapping
+                    )   
+                
+                    if database_engine:
+                        logstar.write_to_db(
+                            dataframe=df,
+                            database_engine=database_engine,
+                            db_schema=db_schema,
+                            db_table_prefix=db_table_prefix,
+                        )
                 time.sleep(interval)
         except KeyboardInterrupt:
             logging.warning("interrupted, program is going to shutdown ...")
+    
+    
     else:
         # download data fro with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
-        logstar.manage_dl_db(
-            conf,
-            database_engine,
-            processing_steps=processing_steps,
-            sensor_mapping=sensor_mapping,
-            csv_folder=args.csv_outfolder,
-            db_schema=db_schema,
-            db_table_prefix=db_table_prefix,
-        )
+        for station in conf["stationlist"]:
+            df = logstar.download_station_data(
+                conf=conf,
+                station=station,
+                processing_steps=processing_steps,
+                sensor_mapping=sensor_mapping
+            )   
+
+            if database_engine:
+                logstar.write_to_db(
+                    dataframe=df,
+                    database_engine=database_engine,
+                    db_schema=db_schema,
+                    db_table_prefix=db_table_prefix,
+                )
+            
+            # write to file
+            if args.csv_folder:
+                filepath = os.path.join(args.csv_folder, station + ".csv")
+                df.to_csv(
+                    filepath,
+                    sep=",",
+                    quotechar='"',
+                    header=True,
+                    mode="a",
+                    doublequote=False,
+                    quoting=csv.QUOTE_MINIMAL,
+                    index=False,
+                )
+        
+            if args.geo:
+                import geopandas
+                filepath = os.path.join(args.csv_folder, station + ".geojson")
+                geometry = geopandas.points_from_xy([self.station["lon"]], [self.station["lat"]], [self.station["altitude"]])
+
+                geo = geopandas.GeoDataFrame({"station": self.station["name"], "geometry": geometry},crs={"init": "epsg:4326"})
+                join = geo.merge(df, left_on="station", right_on="station")
+                join.to_file(filepath, encoding="utf-8")
 
     if database_engine:
         logging.info("Closing database connection ...")
