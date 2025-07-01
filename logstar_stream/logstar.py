@@ -335,9 +335,8 @@ def write_to_database(
         df.to_sql(**to_sql_arugments)
         logging.info(f"succesfully writing data ...")
     except Exception as E:
-        logging.error(f"failed writing data ...")
-        logging.error(E)
-
+        logging.error(f"failed writing data: {str(E)[:200]}")  # Print first 200 chars of error
+        
 
 def manage_dl_db(
     conf,
