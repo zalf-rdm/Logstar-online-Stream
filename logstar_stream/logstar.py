@@ -35,10 +35,11 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     :param data_iter: the data to insert
     :type data_iter: iterator over dictionaries
     """
-    insert_stmt = insert(table.table).values(list(data_iter))
-    on_conflict_stmt = insert_stmt.on_conflict_do_nothing(index_elements=[keys])
-    conn.execute(on_conflict_stmt)
-    
+    data = [dict(zip(keys, row)) for row in data_iter]
+    stmt = insert(table.table).values(data).on_conflict_do_nothing()
+    result = conn.execute(stmt)
+    return result.rowcount
+
 
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
 def create_table(
@@ -213,15 +214,13 @@ def request_data(url, timeout):
 
     """
     logging.debug("requesting {} ...".format(url))
-    try:
-        r = requests.get(url, timeout=timeout)
-    except:
-        return None
+    r = requests.get(url, timeout=timeout)
+
     if r.status_code == 200:
         return r.text
     else:
-        logging.debug("Request error {}".format(r.status_code))
-        return None
+        logging.error("Request error {}".format(r.status_code))
+        exit(1)
 
 
 def download_data(conf, station, timeout=15):
@@ -244,7 +243,7 @@ def download_data(conf, station, timeout=15):
         logging.error(
             f"Error when downloading data for station {station} using url {url}...\n{request}"
         )
-        return None
+        exit(1)
 
 
 def prepare_dataframe(data: Dict, datetime_column: str) -> pd.DataFrame:
@@ -316,7 +315,7 @@ def write_to_database(
             not "constrained_columns" in contrains
             or datetime_column not in contrains["constrained_columns"]
         ):
-            logging.error(
+            logging.warning(
                 f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ..."
             )
 
@@ -327,18 +326,17 @@ def write_to_database(
         "if_exists": "append",
         "index": False,
         "chunksize": 1024,
-        "method": insert_ignore_conflicts # insert_or_do_nothing_on_conflict,
+        "method": insert_or_do_nothing_on_conflict
     }
 
     try:
         num_rows = len(df)
         logging.info(f"Attempting to insert {num_rows} rows into {table_name} ...")
-        #breakpoint()
         df.to_sql(**to_sql_arugments)
         logging.info(f"succesfully writing data ...")
     except Exception as E:
         logging.error(f"failed writing data: {str(E)[:200]}")  # Print first 200 chars of error
-        
+        exit(1)
 
 def manage_dl_db(
     conf,
