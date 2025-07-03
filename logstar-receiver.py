@@ -233,40 +233,15 @@ def main():
     # skip database driver evaluation if -nodb set
     if not args.disable_database:
         # test database connection
-        if conf["db_driver"] == "PostgreSQL":
-            connection_url = URL.create(
-                "postgresql",
-                username=conf["db_username"],
-                password=conf["db_password"],
-                host=conf["db_host"],
-                port=conf["db_port"],
-                database=conf["db_database"],
-            )
-            database_engine = create_engine(connection_url)
-
-        elif conf["db_driver"] == "ODBC Driver 17 for SQL Server":
-            connection_url = URL.create(
-                "mssql+pyodbc",
-                username=conf["db_username"],
-                password=conf["db_password"],
-                host=conf["db_host"],
-                port=conf["db_port"],
-                database=conf["db_database"],
-                query={
-                    "driver": conf["db_driver"],
-                    "authentication": "ActiveDirectoryIntegrated",
-                },
-            )
-            database_engine = create_engine(connection_url)
-
-        else:
-            logging.error(
-                'provided "db_driver": "{}"  unknown, logstar only supports "PostgreSQL" and "ODBC Driver 17 for SQL Server"...'.format(
-                    conf["db_driver"]
-                )
-            )
-            sys.exit(1)
-
+        connection_url = URL.create(
+            "postgresql",
+            username=conf["db_username"],
+            password=conf["db_password"],
+            host=conf["db_host"],
+            port=conf["db_port"],
+            database=conf["db_database"],
+        )
+        
         # try connect to database
         i = 0
         while True:
