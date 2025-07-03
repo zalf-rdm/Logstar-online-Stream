@@ -325,7 +325,7 @@ def write_to_database(
             "schema": db_schema,
             "if_exists": "append",
             "index": False,
-            "chunksize": 8192,
+            "chunksize": 4096,
             "method": insert_or_do_nothing_on_conflict
         }
 

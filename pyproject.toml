@@ -14,9 +14,8 @@ requires-python = '>=3.8'
 #include = ["logstar_stream", "logstar_stream.processing_steps"]
 dependencies = [
     "requests==2.32.3",
-    "sqlalchemy==1.4.39",
-    "pandas==1.4.3",
-    "numpy==1.26.4",
+    "sqlalchemy==2.0.41",
+    "pandas==2.3.0",
     "psycopg2-binary==2.9.10"
 ]
 [project.urls]
