@@ -289,8 +289,10 @@ def write_to_database(
     name, df, database_engine, db_schema, db_table_prefix, datetime_column, **kwargs
 ):
     table_name = db_table_prefix + name
-
-    if not inspect(database_engine).has_table(table_name=table_name, schema=db_schema):
+    with database_engine.begin() as conn:
+        has_table = inspect(conn).has_table(table_name=table_name, schema=db_schema)
+    
+    if not has_table:
         logging.info(
             f"creating database table {table_name} with primary key on {datetime_column} ..."
         )
@@ -308,9 +310,10 @@ def write_to_database(
             )
     
     else:
-        contrains = inspect(database_engine).get_pk_constraint(
-            table_name=table_name, schema=db_schema
-        )
+        with database_engine.begin() as conn:
+            contrains = inspect(conn).get_pk_constraint(
+                table_name=table_name, schema=db_schema
+            )
         if (
             not "constrained_columns" in contrains
             or datetime_column not in contrains["constrained_columns"]
@@ -318,17 +321,18 @@ def write_to_database(
             logging.warning(
                 f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ..."
             )
-    with database_engine.begin() as conn:
-        to_sql_arugments = {
-            "name": table_name,
-            "con": database_engine,
-            "schema": db_schema,
-            "if_exists": "append",
-            "index": False,
-            "chunksize": 4096,
-            "method": insert_or_do_nothing_on_conflict
-        }
 
+    to_sql_arugments = {
+        "name": table_name,
+        "con": database_engine,
+        "schema": db_schema,
+        "if_exists": "append",
+        "index": False,
+        "chunksize": 4096,
+        "method": insert_or_do_nothing_on_conflict
+    }
+
+    with database_engine.begin() as conn:
         try:
             num_rows = len(df)
             logging.info(f"Attempting to insert {num_rows} rows into {table_name} ...")
