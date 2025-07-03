@@ -36,9 +36,9 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     :type data_iter: iterator over dictionaries
     """
     insert_stmt = insert(table.table).values(list(data_iter))
-    on_duplicate_key_stmt = insert_stmt.on_conflict_do_nothing()
-    conn.execute(on_duplicate_key_stmt)
-
+    on_conflict_stmt = insert_stmt.on_conflict_do_nothing(index_elements=[keys])
+    conn.execute(on_conflict_stmt)
+    
 
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
 def create_table(
@@ -78,6 +78,7 @@ def create_table(
         for col, my_type in dtype.items():
             if not isinstance(to_instance(my_type), TypeEngine):
                 raise ValueError("The type of %s is not a SQLAlchemy " "type " % col)
+    
     table = pd.io.sql.SQLTable(
         name,
         self,
@@ -296,7 +297,6 @@ def write_to_database(
             f"creating database table {table_name} with primary key on {datetime_column} ..."
         )
         pandas_sql = pd.io.sql.pandasSQL_builder(database_engine, schema=db_schema)
-
         # create table with constrains
         create_table(
             pandas_sql,
@@ -326,12 +326,14 @@ def write_to_database(
         "schema": db_schema,
         "if_exists": "append",
         "index": False,
-        "chunksize": 4096,
-        "method": insert_or_do_nothing_on_conflict,
+        "chunksize": 1024,
+        "method": insert_ignore_conflicts # insert_or_do_nothing_on_conflict,
     }
 
     try:
-        logging.info(f"writing {table_name} to database ...")
+        num_rows = len(df)
+        logging.info(f"Attempting to insert {num_rows} rows into {table_name} ...")
+        #breakpoint()
         df.to_sql(**to_sql_arugments)
         logging.info(f"succesfully writing data ...")
     except Exception as E:
