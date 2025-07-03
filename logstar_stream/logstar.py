@@ -35,9 +35,15 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     :param data_iter: the data to insert
     :type data_iter: iterator over dictionaries
     """
-    insert_stmt = insert(table.table).values(list(data_iter))
-    on_conflict_stmt = insert_stmt.on_conflict_do_nothing(index_elements=[keys])
-    conn.execute(on_conflict_stmt)
+    data = [dict(zip(keys, row)) for row in data_iter]
+    stmt = insert(table.table).values(data).on_conflict_do_nothing(index_elements=[keys])
+    result = conn.execute(stmt)
+    return result.rowcount
+
+    
+    # insert_stmt = insert(table.table).values(list(data_iter))
+    # on_conflict_stmt = insert_stmt.on_conflict_do_nothing(index_elements=[keys])
+    # conn.execute(on_conflict_stmt)
     
 
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
@@ -314,10 +320,9 @@ def write_to_database(
             not "constrained_columns" in contrains
             or datetime_column not in contrains["constrained_columns"]
         ):
-            logging.error(
+            logging.warning(
                 f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ..."
             )
-            exit(1)
 
     to_sql_arugments = {
         "name": table_name,
