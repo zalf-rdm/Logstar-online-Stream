@@ -41,8 +41,6 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     return result.rowcount
 
 
-from pandas.io.sql import SQLDatabase
-
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
 def create_table(
     table_name,
@@ -320,7 +318,6 @@ def write_to_database(
             logging.warning(
                 f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ..."
             )
-    
     with database_engine.begin() as conn:
         to_sql_arugments = {
             "name": table_name,
