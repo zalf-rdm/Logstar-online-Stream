@@ -36,21 +36,23 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     :type data_iter: iterator over dictionaries
     """
     data = [dict(zip(keys, row)) for row in data_iter]
-    stmt = insert(table.table).values(data).on_conflict_do_nothing()
+    stmt = insert(table.table).values(data).on_conflict_do_nothing(index_elements=["Datetime"])
     result = conn.execute(stmt)
     return result.rowcount
 
 
+from pandas.io.sql import SQLDatabase
+
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
 def create_table(
-    self,
+    table_name,
+    database_engine,
     frame,
-    name,
     if_exists="fail",
     index=True,
     index_label=None,
+    keys=None,
     schema=None,
-    chunksize=None,
     dtype=None,
     **kwargs,
 ):
@@ -71,7 +73,6 @@ def create_table(
     Raises:
         ValueError: If the specified dtype is not a valid SQLAlchemy type.
     """
-
     if dtype is not None:
         from sqlalchemy.types import to_instance, TypeEngine
 
@@ -81,18 +82,18 @@ def create_table(
                 raise ValueError("The type of %s is not a SQLAlchemy " "type " % col)
     
     table = pd.io.sql.SQLTable(
-        name,
-        self,
+        table_name,
+        database_engine,
         frame=frame,
         index=index,
         if_exists=if_exists,
         index_label=index_label,
         schema=schema,
+        keys=keys,
         dtype=dtype,
         **kwargs,
     )
     table.create()
-
 
 def build_url(conf, station, channel=0):
     """build url to request from
@@ -295,18 +296,19 @@ def write_to_database(
         logging.info(
             f"creating database table {table_name} with primary key on {datetime_column} ..."
         )
-        pandas_sql = pd.io.sql.pandasSQL_builder(database_engine, schema=db_schema)
-        # create table with constrains
-        create_table(
-            pandas_sql,
-            df,
-            table_name,
-            index=None,
-            index_label=None,
-            keys=datetime_column,
-            if_exists="replace",
-        )
-
+        with database_engine.begin() as conn:
+            pandas_sql = pd.io.sql.pandasSQL_builder(conn, schema=db_schema)
+            # create table with constrains
+            create_table(
+                frame=df,
+                table_name=table_name,
+                database_engine=pandas_sql,
+                index=None,
+                schema=db_schema,
+                index_label=None,
+                keys=datetime_column,
+            )
+    
     else:
         contrains = inspect(database_engine).get_pk_constraint(
             table_name=table_name, schema=db_schema
@@ -318,25 +320,26 @@ def write_to_database(
             logging.warning(
                 f"Table {table_name} has no primary key set on {datetime_column} column, this can result in duplicated data in table  ..."
             )
+    
+    with database_engine.begin() as conn:
+        to_sql_arugments = {
+            "name": table_name,
+            "con": database_engine,
+            "schema": db_schema,
+            "if_exists": "append",
+            "index": False,
+            "chunksize": 1024,
+            "method": insert_or_do_nothing_on_conflict
+        }
 
-    to_sql_arugments = {
-        "name": table_name,
-        "con": database_engine,
-        "schema": db_schema,
-        "if_exists": "append",
-        "index": False,
-        "chunksize": 1024,
-        "method": insert_or_do_nothing_on_conflict
-    }
-
-    try:
-        num_rows = len(df)
-        logging.info(f"Attempting to insert {num_rows} rows into {table_name} ...")
-        df.to_sql(**to_sql_arugments)
-        logging.info(f"succesfully writing data ...")
-    except Exception as E:
-        logging.error(f"failed writing data: {str(E)[:200]}")  # Print first 200 chars of error
-        exit(1)
+        try:
+            num_rows = len(df)
+            logging.info(f"Attempting to insert {num_rows} rows into {table_name} ...")
+            df.to_sql(**to_sql_arugments)
+            logging.info(f"succesfully writing data ...")
+        except Exception as E:
+            logging.error(f"failed writing data: {str(E)[:200]}")  # Print first 200 chars of error
+            exit(1)
 
 def manage_dl_db(
     conf,
