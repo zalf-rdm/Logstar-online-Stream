@@ -36,15 +36,10 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     :type data_iter: iterator over dictionaries
     """
     data = [dict(zip(keys, row)) for row in data_iter]
-    stmt = insert(table.table).values(data).on_conflict_do_nothing(index_elements=[keys])
+    stmt = insert(table.table).values(data).on_conflict_do_nothing()
     result = conn.execute(stmt)
     return result.rowcount
 
-    
-    # insert_stmt = insert(table.table).values(list(data_iter))
-    # on_conflict_stmt = insert_stmt.on_conflict_do_nothing(index_elements=[keys])
-    # conn.execute(on_conflict_stmt)
-    
 
 # ref: https://stackoverflow.com/questions/30867390/python-pandas-to-sql-how-to-create-a-table-with-a-primary-key
 def create_table(
