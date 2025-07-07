@@ -35,8 +35,13 @@ def insert_or_do_nothing_on_conflict(table, conn, keys, data_iter):
     :param data_iter: the data to insert
     :type data_iter: iterator over dictionaries
     """
+    if keys[0] == "Date":
+        index_elements = [keys[0], keys[1]]
+    else:
+        index_elements = [keys[0]]
+    
     data = [dict(zip(keys, row)) for row in data_iter]
-    stmt = insert(table.table).values(data).on_conflict_do_nothing(index_elements=["Datetime"])
+    stmt = insert(table.table).values(data).on_conflict_do_nothing(index_elements=index_elements)
     result = conn.execute(stmt)
     return result.rowcount
 
