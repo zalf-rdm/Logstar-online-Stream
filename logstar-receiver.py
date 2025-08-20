@@ -22,10 +22,10 @@ DEFAULT_DB_SCHEMA = "public"
 REQUIRED_ENV_VARS = ["LOGSTAR_APIKEY", "LOGSTAR_STATIONS"]
 
 def calc_diff_days(startdate, enddate):
-    d2 = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
-    d1 = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
+    start_date_obj = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
+    end_date_obj = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
 
-    return (d1 - d2).days
+    return (end_date_obj - start_date_obj).days
 
 def calc_new_end_date(current_start_date, conf, chunk_delta) -> str:
     """calculate new end date based on current start date and chunk delta"""
