@@ -22,12 +22,12 @@ DEFAULT_DB_SCHEMA = "public"
 REQUIRED_ENV_VARS = ["LOGSTAR_APIKEY", "LOGSTAR_STATIONS"]
 
 def calc_diff_days(startdate, enddate):
-    d2 = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
-    d1 = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
+    start_date_obj = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
+    end_date_obj = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
 
-    return (d1 - d2).days
+    return (end_date_obj - start_date_obj).days
 
-def calc_new_end_date(current_start_date, conf, chunk_delta) -> str:
+def calc_new_end_date(current_start_date, final_end_date_obj, chunk_delta) -> str:
     """calculate new end date based on current start date and chunk delta"""
     current_start_date = datetime.datetime.strptime(current_start_date, '%Y-%m-%d').date()
     
@@ -35,8 +35,8 @@ def calc_new_end_date(current_start_date, conf, chunk_delta) -> str:
     new_end_date = current_start_date + datetime.timedelta(days=chunk_delta)
 
     # check if new end date is after the configured end date
-    if new_end_date > datetime.datetime.strptime(conf["enddate"], '%Y-%m-%d').date():
-        return conf["enddate"]
+    if new_end_date > final_end_date_obj:
+        return final_end_date_obj.strftime('%Y-%m-%d')
     
     return new_end_date.strftime('%Y-%m-%d')
 
@@ -343,7 +343,7 @@ def main():
             logging.info("Running in chunked mode with delta set to: {} days ...".format(args.chunk_delta))
             
             sliding_conf = conf.copy()
-            while sliding_conf["startdate"] != conf["enddate"]:
+            while True:
                 sliding_conf["enddate"] = calc_new_end_date(sliding_conf["startdate"], conf, args.chunk_delta)
                 logstar.manage_dl_db(
                         sliding_conf,
@@ -357,7 +357,11 @@ def main():
                         datetime_column=args.rename_datetime,
                     )
 
-                sliding_conf["startdate"] = sliding_conf["enddate"]
+                if sliding_conf["enddate"] == conf["enddate"]:
+                    break
+                
+                next_start_date = (datetime.datetime.strptime(sliding_conf["enddate"], '%Y-%m-%d').date() + datetime.timedelta(days=1))
+                sliding_conf["startdate"] = next_start_date.strftime('%Y-%m-%d')
         
         # run without chunking
         else:
