@@ -343,7 +343,7 @@ def main():
             logging.info("Running in chunked mode with delta set to: {} days ...".format(args.chunk_delta))
             
             sliding_conf = conf.copy()
-            while sliding_conf["startdate"] != conf["enddate"]:
+            while True:
                 sliding_conf["enddate"] = calc_new_end_date(sliding_conf["startdate"], conf, args.chunk_delta)
                 logstar.manage_dl_db(
                         sliding_conf,
@@ -357,7 +357,11 @@ def main():
                         datetime_column=args.rename_datetime,
                     )
 
-                sliding_conf["startdate"] = sliding_conf["enddate"]
+                if sliding_conf["enddate"] == conf["enddate"]:
+                    break
+                
+                next_start_date = (datetime.datetime.strptime(sliding_conf["enddate"], '%Y-%m-%d').date() + datetime.timedelta(days=1))
+                sliding_conf["startdate"] = next_start_date.strftime('%Y-%m-%d')
         
         # run without chunking
         else:
