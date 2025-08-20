@@ -30,7 +30,7 @@ def calc_diff_days(startdate, enddate):
 def calc_new_end_date(current_start_date, final_end_date_obj, chunk_delta) -> str:
     """calculate new end date based on current start date and chunk delta"""
     current_start_date = datetime.datetime.strptime(current_start_date, '%Y-%m-%d').date()
-    
+    final_end_date_obj = datetime.datetime.strptime(final_end_date_obj, '%Y-%m-%d').date()
     # calculate new end date based on chunk delta
     new_end_date = current_start_date + datetime.timedelta(days=chunk_delta)
 
@@ -344,7 +344,7 @@ def main():
             
             sliding_conf = conf.copy()
             while True:
-                sliding_conf["enddate"] = calc_new_end_date(sliding_conf["startdate"], conf, args.chunk_delta)
+                sliding_conf["enddate"] = calc_new_end_date(sliding_conf["startdate"], conf["enddate"], args.chunk_delta)
                 logstar.manage_dl_db(
                         sliding_conf,
                         database_engine,
