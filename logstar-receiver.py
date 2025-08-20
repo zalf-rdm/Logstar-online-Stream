@@ -199,8 +199,8 @@ def main():
         "stations": os.environ.get("LOGSTAR_STATIONS"),
         "geodata": os.environ.get("LOGSTAR_GEODATA", True),
         "datetime": os.environ.get("LOGSTAR_DAYTIME", 0),
-        "startdate": os.environ.get("LOGSTAR_STARTDATE"),
-        "enddate": os.environ.get("LOGSTAR_ENDDATE"),
+        "startdate": os.environ.get("LOGSTAR_STARTDATE", "2021-01-01"),
+        "enddate": os.environ.get("LOGSTAR_ENDDATE", "2022-01-01"),
         "db_host": os.environ.get("LOGSTAR_DB_HOST", "localhost"),
         "db_database": os.environ.get("LOGSTAR_DB_DBNAME", "logstar"),
         "db_driver": os.environ.get("LOGSTAR_DB_DRIVER", "PostgreSQL"),
@@ -212,8 +212,6 @@ def main():
     required_env_vars = [
         "apikey",
         "stations",
-        "startdate",
-        "enddate"
     ]
     # check if all required env vars are set
     for re in required_env_vars:
