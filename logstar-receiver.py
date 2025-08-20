@@ -27,7 +27,7 @@ def calc_diff_days(startdate, enddate):
 
     return (end_date_obj - start_date_obj).days
 
-def calc_new_end_date(current_start_date, conf, chunk_delta) -> str:
+def calc_new_end_date(current_start_date, final_end_date_obj, chunk_delta) -> str:
     """calculate new end date based on current start date and chunk delta"""
     current_start_date = datetime.datetime.strptime(current_start_date, '%Y-%m-%d').date()
     
@@ -35,8 +35,8 @@ def calc_new_end_date(current_start_date, conf, chunk_delta) -> str:
     new_end_date = current_start_date + datetime.timedelta(days=chunk_delta)
 
     # check if new end date is after the configured end date
-    if new_end_date > datetime.datetime.strptime(conf["enddate"], '%Y-%m-%d').date():
-        return conf["enddate"]
+    if new_end_date > final_end_date_obj:
+        return final_end_date_obj.strftime('%Y-%m-%d')
     
     return new_end_date.strftime('%Y-%m-%d')
 
