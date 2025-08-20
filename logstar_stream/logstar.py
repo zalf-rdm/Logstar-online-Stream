@@ -245,7 +245,7 @@ def download_data(conf, station, timeout=15):
         return json.loads(request)
     except:
         logging.error(
-            f"Error when downloading data for station {station} using url {url}...\n{request}"
+            f"Error when downloading data for station {station} using url {url}...\n"
         )
         exit(1)
 

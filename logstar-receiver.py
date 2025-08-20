@@ -21,6 +21,25 @@ DEFAULT_DB_SCHEMA = "public"
 # env vars which must be set to run logstar stream
 REQUIRED_ENV_VARS = ["LOGSTAR_APIKEY", "LOGSTAR_STATIONS"]
 
+def calc_diff_days(startdate, enddate):
+    start_date_obj = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
+    end_date_obj = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
+
+    return (end_date_obj - start_date_obj).days
+
+def calc_new_end_date(current_start_date, final_end_date_obj, chunk_delta) -> str:
+    """calculate new end date based on current start date and chunk delta"""
+    current_start_date = datetime.datetime.strptime(current_start_date, '%Y-%m-%d').date()
+    
+    # calculate new end date based on chunk delta
+    new_end_date = current_start_date + datetime.timedelta(days=chunk_delta)
+
+    # check if new end date is after the configured end date
+    if new_end_date > final_end_date_obj:
+        return final_end_date_obj.strftime('%Y-%m-%d')
+    
+    return new_end_date.strftime('%Y-%m-%d')
+
 
 def configure_logging(debug, filename=None):
     """define loglevel and log to file or to std"""
@@ -52,6 +71,15 @@ def main():
 
     parser.add_argument(
         "-i", "--interval", type=int, default=20, help="sampling interval in minutes"
+    )
+
+    parser.add_argument(
+        "-c",
+        "--chunk-delta",
+        type=int,
+        dest="chunk_delta",
+        default=90, 
+        help="chunk duration in days for start and endtime of data download (default: 90 days), to disable set to: 0"
     )
 
     parser.add_argument(
@@ -171,8 +199,8 @@ def main():
         "stations": os.environ.get("LOGSTAR_STATIONS"),
         "geodata": os.environ.get("LOGSTAR_GEODATA", True),
         "datetime": os.environ.get("LOGSTAR_DAYTIME", 0),
-        "startdate": os.environ.get("LOGSTAR_STARTDATE", "2021-01-01"),
-        "enddate": os.environ.get("LOGSTAR_ENDDATE", "2021-05-02"),
+        "startdate": os.environ.get("LOGSTAR_STARTDATE"),
+        "enddate": os.environ.get("LOGSTAR_ENDDATE"),
         "db_host": os.environ.get("LOGSTAR_DB_HOST", "localhost"),
         "db_database": os.environ.get("LOGSTAR_DB_DBNAME", "logstar"),
         "db_driver": os.environ.get("LOGSTAR_DB_DRIVER", "PostgreSQL"),
@@ -180,6 +208,18 @@ def main():
         "db_password": os.environ.get("LOGSTAR_DB_PASS", "postgres"),
         "db_port": os.environ.get("LOGSTAR_DB_PORT", "5432"),
     }
+
+    required_env_vars = [
+        "apikey",
+        "stations",
+        "startdate",
+        "enddate"
+    ]
+    # check if all required env vars are set
+    for re in required_env_vars:
+        if not conf[re]:
+            logging.error(f"Missing {re} in environment variables, bye ...")
+            sys.exit(1)
 
     logging.debug("loaded environment variables:")
     [logging.debug('\t{} -> "{}"'.format(key, value)) for key, value in conf.items()]
@@ -296,18 +336,47 @@ def main():
             logging.warning("interrupted, program is going to shutdown ...")
 
     else:
-        # download data from api with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
-        logstar.manage_dl_db(
-            conf,
-            database_engine,
-            processing_steps=processing_steps,
-            sensor_mapping=sensor_mapping,
-            csv_folder=args.csv_outfolder,
-            db_schema=db_schema,
-            db_table_prefix=db_table_prefix,
-            timeout=args.timeout,
-            datetime_column=args.rename_datetime,
-        )
+        # check if chunk delta is set and if the difference between start and end date is larger than chunk delta
+        if args.chunk_delta > 0 and calc_diff_days(conf["startdate"], conf["enddate"]) > args.chunk_delta:
+            
+            # iterate over sliding windowand run manage_dl_db for each chunk
+            logging.info("Running in chunked mode with delta set to: {} days ...".format(args.chunk_delta))
+            
+            sliding_conf = conf.copy()
+            while True:
+                sliding_conf["enddate"] = calc_new_end_date(sliding_conf["startdate"], conf, args.chunk_delta)
+                logstar.manage_dl_db(
+                        sliding_conf,
+                        database_engine,
+                        processing_steps=processing_steps,
+                        sensor_mapping=sensor_mapping,
+                        csv_folder=args.csv_outfolder,
+                        db_schema=db_schema,
+                        db_table_prefix=db_table_prefix,
+                        timeout=args.timeout,
+                        datetime_column=args.rename_datetime,
+                    )
+
+                if sliding_conf["enddate"] == conf["enddate"]:
+                    break
+                
+                next_start_date = (datetime.datetime.strptime(sliding_conf["enddate"], '%Y-%m-%d').date() + datetime.timedelta(days=1))
+                sliding_conf["startdate"] = next_start_date.strftime('%Y-%m-%d')
+        
+        # run without chunking
+        else:
+            # download data from api with given parameters: conf, sensor-mapping, database-conn, db-conf, csv-outfolder
+            logstar.manage_dl_db(
+                conf,
+                database_engine,
+                processing_steps=processing_steps,
+                sensor_mapping=sensor_mapping,
+                csv_folder=args.csv_outfolder,
+                db_schema=db_schema,
+                db_table_prefix=db_table_prefix,
+                timeout=args.timeout,
+                datetime_column=args.rename_datetime,
+            )
 
     if database_engine:
         logging.info("Closing database connection ...")
