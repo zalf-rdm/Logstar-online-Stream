@@ -11,7 +11,7 @@ sudo apt install unixodbc-dev python3-dev postgresql-server-dev-10
 
 install pip requirments
 ```bash
-pip install -r requirments.txt
+pip install -e .
 ```
 
 before starting the logstar-receiver.py. Load settings into environment. This can be done creating a load-config.sh based on the load-config.sh-example. Load config into environment(Linux) via:
