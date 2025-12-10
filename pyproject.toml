@@ -13,10 +13,11 @@ authors = [{ name = "marcel wallschlaeger", email="marcel.wallschlaeger@zalf.de"
 requires-python = '>=3.8'
 #include = ["logstar_stream", "logstar_stream.processing_steps"]
 dependencies = [
-    "requests==2.28.1",
-    "sqlalchemy==1.4.39",
-    "pandas==1.4.3"
-
+    "requests>=2.28.1",
+    "sqlalchemy>=1.4.39",
+    "pandas>=2.0.0",
+    "geopandas",
+    "aiohttp"
 ]
 [project.urls]
 repository = "https://github.com/zalf-rdm/Logstar-online-Stream/"
@@ -24,3 +25,4 @@ repository = "https://github.com/zalf-rdm/Logstar-online-Stream/"
 [tool.setuptools.packages.find]
 include = ["logstar_stream*", "logstar_stream.processing_steps*"]
 namespaces = true
+ 

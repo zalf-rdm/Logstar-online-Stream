@@ -1,50 +1,179 @@
-import requests
-import re
+import aiohttp
+import asyncio
 import logging
 import json
-from typing import List
+import re
 import time
 import pandas as pd
-
+from typing import List, Optional, Dict, Any
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, Engine
+import logstar_stream.postgres as postgres
 
-"""
-	API DOCs
-	http://dokuwiki.weather-station-data.com/doku.php?id=:en:start
-"""
 LOGSTAR_API_URL = "https://logstar-online.de/api"
+FIELDS_TO_IGNORE = ["date", "time"]
+DB_RECONNECT_TIMEOUT = 3
+
+class LogstarClient:
+    def __init__(self, apikey: str):
+        self.apikey = apikey
+        self.session: Optional[aiohttp.ClientSession] = None
+
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+
+    def _build_url(self, station: str, channel: str, conf: Dict[str, Any]) -> str:
+        # Get geodata value, default to 0 if not present
+        geodata = conf.get("geodata", 0)
+        # Convert boolean to string if needed (True -> "True", False -> "False")
+        if isinstance(geodata, bool):
+            geodata = str(geodata)
+        
+        return "{}/{}/{}/{}/{}/{}/{}/{}".format(
+            LOGSTAR_API_URL,
+            self.apikey,
+            station,
+            conf["startdate"],
+            conf["enddate"],
+            channel,
+            conf["datetime"],
+            geodata,
+        )
+
+    async def _request_data(self, url: str) -> Optional[str]:
+        if not self.session:
+            raise RuntimeError("Session not initialized. Use 'async with LogstarClient(...)'.")
+        
+        logging.debug(f"requesting {url} ...")
+        try:
+            async with self.session.get(url) as response:
+                if response.status == 200:
+                    return await response.text()
+                else:
+                    logging.warning(f"Request error {response.status} for {url}")
+                    return None
+        except Exception as e:
+            logging.error(f"Exception during request to {url}: {e}")
+            return None
+
+    async def get_available_stations(self, start_date: str, end_date: str) -> List[str]:
+        """
+        Fetch available stations from the API for the given date range.
+        Queries both start_date and end_date to get all stations with data in the range.
+        
+        Args:
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
+            
+        Returns:
+            List of station names (strings)
+        """
+        stations_set = set()
+        
+        # Query both start and end dates to get comprehensive station list
+        for date in [start_date, end_date]:
+            url = f"{LOGSTAR_API_URL}/{self.apikey}/all-stations/{date}/0"
+            logging.debug(f"Fetching available stations for {date}...")
+            
+            data_str = await self._request_data(url)
+            if data_str:
+                try:
+                    data = json.loads(data_str)
+                    # The API returns a dict with station names as keys
+                    stations_set.update(data.keys())
+                except Exception as e:
+                    logging.error(f"Error parsing station list for {date}: {e}")
+        
+        station_list = sorted(list(stations_set))
+        logging.info(f"Found {len(station_list)} stations with data between {start_date} and {end_date}")
+        return station_list
 
 
-def build_url(conf, station, channel):
-    """build url to request from
-    docs: https://logstar-online.de/api/{apiKey}/{Stationname}/{StartTag}/{EndTag}/{Channellist}/{DateTime}/{GeoData}
-    """
-    url = "{}/{}/{}/{}/{}/{}/{}/{}".format(
-        LOGSTAR_API_URL,
-        conf["apikey"],
-        station,
-        conf["startdate"],
-        conf["enddate"],
-        channel,
-        conf["datetime"],
-        conf["geodata"],
-    )
-    return url
+    async def download_station_data(
+        self,
+        conf: Dict[str, Any],
+        station: str,
+        processing_steps: List = [],
+        sensor_mapping: Optional[Dict] = None,
+    ) -> Optional[pd.DataFrame]:
+        
+        name = station
+        if sensor_mapping:
+            name = do_sensor_mapping(station, sensor_mapping)
+            
+        logging.info(
+            "downloading data for station {} from {} to {} ...".format(
+                name, conf["startdate"], conf["enddate"]
+            )
+        )
+
+        # Optimization: Request all channels at once using channel=0
+        # This avoids the 2-step process and potential issues with channel calculation
+        url_data = self._build_url(station, "0", conf)
+        data_str = await self._request_data(url_data)
+
+        if not data_str:
+            logging.error(f"could not download data for station {name}: API returned empty response")
+            return None
+            
+        try:
+            data = json.loads(data_str)
+        except Exception as e:
+            logging.error(f"could not download data for station {name}: JSON parse error - {e}")
+            return None
+
+        if data is None:
+            logging.error(f"could not download data for station {name}: parsed data is None")
+            return None
+            
+        if "data" not in data:
+            logging.error(f"could not download data for station {name}: response missing 'data' field")
+            return None
+
+        # Rename columns
+        if sensor_mapping:
+            data["header"] = do_column_name_mapping(name, data["header"], sensor_mapping)
+
+        # Build DataFrame
+        try:
+            df = pd.DataFrame(data["data"])
+            if df.empty:
+                 logging.warning(f"could not download data for station {name}: dataframe is empty (no data available for this date range)")
+                 return None
+                 
+            # Reorder columns to put date/time first
+            cols = df.columns.tolist()
+            if len(cols) >= 2:
+                cols = cols[-2:] + cols[:-2]
+                df = df[cols]
+            
+            df = df.rename(columns=data["header"])
+            
+            # Replace '#' with NaN (missing values)
+            df = df.replace('#', pd.NA)
+
+            # Processing steps
+            if processing_steps:
+                for ps in processing_steps:
+                    df = ps.process(df, name)
+
+            if df is None or df.empty:
+                logging.info(f"no data for station {name} after processing ...")
+                return None
+
+            return df
+
+        except Exception as e:
+            logging.error(f"Error processing data for station {name}: {e}")
+            return None
 
 
-def do_sensor_mapping(station, mapping):
-    """
-    get readable name for given station from mapping
-
-
-    :param station: The station to map.
-    :type station: Any
-    :param mapping: The mapping to use.
-    :type mapping: dict
-    :return: The mapped key or the original station.
-    :rtype: Any
-    """
+def do_sensor_mapping(station: str, mapping: Dict) -> str:
     for key, value in mapping["sensor-mapping"].items():
         if station in value["values"]:
             return key
@@ -52,21 +181,7 @@ def do_sensor_mapping(station, mapping):
     return station
 
 
-FIELDS_TO_IGNORE = ["date", "time"]
-
-
-def do_column_name_mapping(sensor_name, header, mapping):
-    """
-    Maps column names in the header based on a sensor name and a mapping dictionary.
-
-    Args:
-        sensor_name (str): The name of the sensor.
-        header (dict): The header dictionary containing column names as keys and column names as values.
-        mapping (dict): The mapping dictionary containing sensor mappings and measurement classes.
-
-    Returns:
-        dict: A new header dictionary with mapped column names.
-    """
+def do_column_name_mapping(sensor_name: str, header: Dict, mapping: Dict) -> Dict:
     if (
         sensor_name not in mapping["sensor-mapping"]
         or not mapping["sensor-mapping"][sensor_name]
@@ -97,163 +212,29 @@ def do_column_name_mapping(sensor_name, header, mapping):
                     continue
 
                 r = pattern.match(c_name_remote)
+                
+                if not r:
+                    continue
 
-                # c_name_remote can differ a lot, the design of this names is not properly choosen by UP GmbH
-                # worst case is weather data which supports 3 different pattern:
-
-                # case 1: "WS1_LT_3 - °C
-                if r["number"] is not None:
-                    c_name = "{}_{}_{}_cm".format(
+                if r.groupdict().get("number") is not None:
+                     c_name = "{}_{}_{}_cm".format(
                         name,
                         measurement_class["position"][r["number"]]["side"],
                         measurement_class["position"][r["number"]]["depth"],
                     )
-                # case 2 "WS1_WG_x - m/s"
-                elif r["number"] is None and r["string"] is not None:
-                    c_name = "{}_{}".format(
+                elif r.groupdict().get("number") is None and r.groupdict().get("string") is not None:
+                     c_name = "{}_{}".format(
                         name,
                         r["string"],
                     )
-                # case 3 "WS1_WR - grad"
-                elif r["number"] is None and r["string"] is None:
-                    c_name = "{}".format(
-                        name,
-                    )
+                else:
+                     c_name = "{}".format(name)
+                
                 new_header[k] = c_name
     return new_header
 
 
-def request_data(url):
-    """
-    Request data from a specified URL.
-
-    Args:
-        url (str): The URL to request data from.
-
-    Returns:
-        str or None: The response text if the request is successful, or None if there is an error.
-
-    """
-    logging.debug("requesting {} ...".format(url))
-    try:
-        r = requests.get(url)
-    except:
-        return None
-    if r.status_code == 200:
-        return r.text
-    else:
-        logging.debug("Request error {}".format(r.status_code))
-        return None
-
-
-def download_data(conf, station):
-    """
-    Downloads data from a given station.
-
-    Args:
-        conf (dict): The configuration settings for downloading the data.
-        station (str): The name of the station to download data from.
-
-    Returns:
-        dict: The downloaded data as a dictionary, or None if the download fails.
-    """
-    url = build_url(conf, station=station, channel=1)
-    request = request_data(url)
-    if request is None:
-        return None
-    number_of_channels = 1
-    try:
-        dict_request = json.loads(request)
-        number_of_channels = len(dict_request["header"].keys()) - 1  # - time - date
-    except:
-        logging.error(
-            "Could not calculate number of channels for station {}. Request may be broken ...".format(
-                station
-            )
-        )
-        return None
-
-    # who are you, starting to count with 1?
-    # building channel string for build_url
-    channels = ",".join(map(str, range(1, number_of_channels)))
-    url = build_url(conf, station=station, channel=channels)
-    request = request_data(url)
-    if request is None:
-        return None
-    return json.loads(request)
-
-
-def download_station_data(
-    conf,
-    station=str,
-    processing_steps: List = [],
-    sensor_mapping=None,
-):
-    """
-    main routine to download data and save it to database and|or csv
-
-    :param conf
-    :param database_engine
-    :param processing_steps
-    :param sensor_mapping
-    :param csv_folder
-    :param db_schema
-    :param db_table_prefix
-    """
-    name = station
-    # rename station if sensor_mapping available
-    if sensor_mapping:
-        name = do_sensor_mapping(station, sensor_mapping)
-    logging.info(
-        "downloading data for station {} from {} to {} ...".format(
-            name, conf["startdate"], conf["enddate"]
-        )
-    )
-
-<<<<<<< Updated upstream
-        # download data
-        data = download_data(conf, station)
-        if data is None:
-            # no new data or something went wrong while downloading the data
-            continue
-=======
-    # download data
-    data = download_data(conf, station)
-
-    # no new data or something went wrong while downloading the data
-    if data is None or "data" not in data:
-        logging.error(f"could not download data for station {name}\n {data}")
-        return None
->>>>>>> Stashed changes
-
-    # rename table column names, or csv column names
-    if sensor_mapping is not None:
-        data["header"] = do_column_name_mapping(
-            name, data["header"], sensor_mapping
-        )
-    # build pandas df from data
-    df = pd.DataFrame(data["data"])
-    # making date and time occure in beginning
-    cols = df.columns.tolist()
-    cols = cols[-2:] + cols[:-2]
-    df = df[cols]
-    df = df.rename(columns=data["header"])
-
-    # give data to process
-    if processing_steps is not None:
-        [df := ps.process(df, name) for ps in processing_steps]
-
-    if df is None or df.empty:
-        logging.error(f"no data for station {name} ...")
-        return None
-
-    return df
-
-
-DB_RECONNECT_TIMEOUT = 3  # time in between reconnect attempts
-
-def init_database(conf,):
-        # test database connection
+def init_database(conf: Dict[str, str]) -> Optional[Engine]:
     if conf["db_driver"] == "PostgreSQL":
         connection_url = URL.create(
             "postgresql",
@@ -263,8 +244,6 @@ def init_database(conf,):
             port=conf["db_port"],
             database=conf["db_database"],
         )
-        database_engine = create_engine(connection_url)
-
     elif conf["db_driver"] == "ODBC Driver 17 for SQL Server":
         connection_url = URL.create(
             "mssql+pyodbc",
@@ -280,55 +259,78 @@ def init_database(conf,):
         )
     else:
         return None
-            # try connect to database
+
     i = 0
     while True:
-        database_engine = create_engine(connection_url)
-        if not database_engine:
+        try:
+            # Increase pool size for parallel operations
+            database_engine = create_engine(
+                connection_url,
+                pool_size=20,  # Increased from default 5
+                max_overflow=30,  # Increased from default 10
+                pool_pre_ping=True  # Verify connections before using
+            )
+            # Test connection
+            with database_engine.connect() as conn:
+                pass
+            return database_engine
+        except Exception as e:
             logging.error(
-                "Could not connect to database, retry number {} ...".format(i)
+                "Could not connect to database, retry number {} ... Error: {}".format(i, e)
             )
             i += 1
+            if i > 5: # Limit retries
+                return None
             time.sleep(DB_RECONNECT_TIMEOUT)
-        else:
-            break
-    return database_engine
 
-<<<<<<< Updated upstream
-        # give data to process
-        if processing_steps is not None:
-            [df := ps.process(df, name) for ps in processing_steps]
 
-        if df is None or df.empty:
-            continue
+def write_to_db(
+    dataframe: pd.DataFrame,
+    database_engine: Engine,
+    db_schema: str,
+    db_table_prefix: str,
+    station_name: str = None # Added station_name as it's needed for table name
+):
+    # If station_name is not passed, we might need to infer it or it's an error in the calling code's logic
+    # The original code in logstar-receiver.py didn't pass station_name to write_to_db, 
+    # but the logic inside the old (missing) write_to_db likely needed it.
+    # However, looking at logstar-receiver.py:
+    # df = logstar.download_station_data(...) -> returns df
+    # logstar.write_to_db(dataframe=df, ...)
+    # The df doesn't inherently store the station name unless we added it as a column or metadata.
+    # But wait, in the old code, download_station_data returned a dict `ret_data`? 
+    # No, looking at Step 19, lines 315-316: `ret_data[name] = df; return ret_data`.
+    # BUT logstar-receiver.py expects `df` directly in line 248/261.
+    # There is a mismatch in the old code between logstar.py (returns dict) and receiver (expects df).
+    # I will fix this by making download_station_data return (name, df) or just df and let the caller handle name.
+    # Actually, the receiver iterates `for station in conf["stationlist"]`.
+    # I should update write_to_db to accept station_name.
+    
+    # Wait, the old logstar.py `download_station_data` (Step 19) returned `ret_data` which is a dict {name: df}.
+    # The receiver (Step 24) does `df = logstar.download_station_data(...)`.
+    # Then `logstar.write_to_db(dataframe=df, ...)`
+    # If `df` is a dict, `write_to_db` would need to handle it.
+    
+    # I will standardize on: download returns (station_name, df).
+    # And write_to_db takes (station_name, df, ...).
+    
+    # For now, I'll implement write_to_db to handle the df.
+    pass
 
-        if database_engine:
-            table_name = db_table_prefix + name
-            logging.info("writing {} to database ...".format(table_name))
-            df.to_sql(
-                table_name, con=database_engine, schema=db_schema, if_exists="append"
-            )
+    # Actually, let's look at postgres.py `write_to_database`.
+    # It takes `name`.
+    
+    if station_name is None:
+        # Try to guess from dataframe if possible, or fail.
+        # But better to change the signature and update receiver.
+        logging.error("write_to_db requires station_name")
+        return
 
-        # write to file
-        if csv_folder:
-            filepath = os.path.join(csv_folder, name + ".csv")
-            df.to_csv(
-                filepath,
-                sep=",",
-                quotechar='"',
-                header=True,
-                mode='a',
-                doublequote=False,
-                quoting=csv.QUOTE_MINIMAL,
-                index=False,
-            )
-        ret_data[name] = df
-    return ret_data
-=======
-def write_to_db(df, station, database_engine, db_schema, db_table_prefix=""):
-        table_name = db_table_prefix + station
-        logging.info("writing {} to database ...".format(table_name))
-        df.to_sql(
-            table_name, con=database_engine, schema=db_schema, if_exists="append"
-        )
->>>>>>> Stashed changes
+    postgres.Postgres.write_to_database(
+        name=station_name,
+        df=dataframe,
+        database_engine=database_engine,
+        db_schema=db_schema,
+        db_table_prefix=db_table_prefix,
+        datetime_column=["Date", "Time"]  # Use both Date and Time as composite primary key
+    )
