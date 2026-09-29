@@ -64,10 +64,12 @@ class ProcessingStep(object):
         function to change given values and add them to the changed list. Which is preparation to write the log with write_log
 
         :param df: dataframe to edit
-        :param row_num: row number the to edit value is in
+        :param row_num: index label of the row the to edit value is in
         :param column_name: column name of the value which is to edit
         """
-        row = df.iloc[row_num]
+        # label based, to match the df.at write below and the labels handed out
+        # by df.iterrows(). df.iloc here breaks on any non-default index.
+        row = df.loc[row_num]
         # depends on config.dateTime if 1: „date“: „2020-04-01“, „time“: „00:00:00“
         if "date" in row and "time" in row:
             logging.debug(
@@ -116,9 +118,12 @@ class ProcessingStep(object):
             None
         """
 
-        if not os.path.exists(PS_LOGGING_DIR):
+        # instance value wins, set from the PS_LOGGING_DIR kwarg in __init__
+        logging_dir = getattr(self, "PS_LOGGING_DIR", PS_LOGGING_DIR)
+
+        if not os.path.exists(logging_dir):
             logging.warning(
-                f"processing step logging folder: {PS_LOGGING_DIR} does not exist, skip logging for {self.ps_name} ..."
+                f"processing step logging folder: {logging_dir} does not exist, skip logging for {self.ps_name} ..."
             )
             return
 
@@ -127,7 +132,7 @@ class ProcessingStep(object):
 
         log_filename = self.ps_name + "_" + station + ".log"
 
-        with open(os.path.join(PS_LOGGING_DIR, log_filename), "a+") as f:
+        with open(os.path.join(logging_dir, log_filename), "a+") as f:
             for d in self.changed:
                 # depends on config.dateTime
                 if "date" in d and "time" in d:

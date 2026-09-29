@@ -1,0 +1,849 @@
+<title>PatchCrop Quality Filters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=Source+Sans+3:wght@300;400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:      #F6F7F5;
+    --surface:     #FFFFFF;
+    --surface-alt: #EEF1EE;
+    --ink:         #1B211D;
+    --ink-soft:    #57605A;
+    --ink-faint:   #868F89;
+    --rule:        #DCE1DC;
+    --accent:      #0B7C46;
+    --accent-soft: #E3EFE8;
+    --alt:         #6B4FC0;
+    --alt-soft:    #ECE7F8;
+    --cut:         #B3261E;
+    --cut-soft:    #F9E7E5;
+
+    --viz-s1:    #0B7C46;
+    --viz-s2:    #6B4FC0;
+    --viz-cut:   #B3261E;
+    --viz-grid:  #E4E8E4;
+    --viz-axis:  #B9C1BA;
+    --viz-muted: #868F89;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #111614;
+      --surface:     #191F1B;
+      --surface-alt: #202722;
+      --ink:         #E6ECE7;
+      --ink-soft:    #A2ACA5;
+      --ink-faint:   #737D76;
+      --rule:        #2B342E;
+      --accent:      #2E9E68;
+      --accent-soft: #172C21;
+      --alt:         #8163D8;
+      --alt-soft:    #201B33;
+      --cut:         #F2857A;
+      --cut-soft:    #2E1A18;
+
+      --viz-s1:    #2E9E68;
+      --viz-s2:    #8163D8;
+      --viz-cut:   #F2857A;
+      --viz-grid:  #262E28;
+      --viz-axis:  #3C463F;
+      --viz-muted: #737D76;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #111614;
+    --surface:     #191F1B;
+    --surface-alt: #202722;
+    --ink:         #E6ECE7;
+    --ink-soft:    #A2ACA5;
+    --ink-faint:   #737D76;
+    --rule:        #2B342E;
+    --accent:      #2E9E68;
+    --accent-soft: #172C21;
+    --alt:         #8163D8;
+    --alt-soft:    #201B33;
+    --cut:         #F2857A;
+    --cut-soft:    #2E1A18;
+
+    --viz-s1:    #2E9E68;
+    --viz-s2:    #8163D8;
+    --viz-cut:   #F2857A;
+    --viz-grid:  #262E28;
+    --viz-axis:  #3C463F;
+    --viz-muted: #737D76;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 2rem) 5rem;
+    display: flex; flex-direction: column; gap: 3.25rem;
+  }
+
+  .masthead { display: flex; flex-direction: column; gap: 1rem; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin: 0;
+  }
+  h1 {
+    font-family: "Zilla Slab", Georgia, serif; font-weight: 700;
+    font-size: clamp(2.1rem, 6vw, 3rem); line-height: 1.08;
+    letter-spacing: -0.015em; text-wrap: balance; margin: 0;
+  }
+  .standfirst {
+    font-size: 1.14rem; font-weight: 300; line-height: 1.6;
+    color: var(--ink-soft); max-width: var(--measure); margin: 0;
+  }
+
+  .scope {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+    border-radius: 3px; overflow: hidden;
+  }
+  .scope div { background: var(--surface); padding: 0.95rem 1.1rem; }
+  .scope dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.66rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 0.28rem;
+  }
+  .scope dd {
+    margin: 0; font-family: "Zilla Slab", Georgia, serif; font-size: 1.42rem;
+    font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.15;
+  }
+  .scope dd small {
+    display: block; font-family: "Source Sans 3", sans-serif; font-size: 0.8rem;
+    font-weight: 400; color: var(--ink-soft); letter-spacing: 0;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.15rem; }
+  h2 {
+    font-family: "Zilla Slab", Georgia, serif; font-weight: 600; font-size: 1.58rem;
+    line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; margin: 0;
+    padding-bottom: 0.5rem; border-bottom: 2px solid var(--ink);
+  }
+  p { margin: 0; max-width: var(--measure); }
+  .lede { color: var(--ink-soft); }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.86em;
+    background: var(--surface-alt); padding: 0.1em 0.36em; border-radius: 2px;
+  }
+
+  .filter {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .filter > header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.55rem 0.9rem;
+    padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--rule);
+    border-left: 4px solid var(--tone, var(--accent));
+  }
+  .filter h3 {
+    font-family: "Zilla Slab", Georgia, serif; font-size: 1.2rem; font-weight: 600;
+    margin: 0; flex: 1 1 auto;
+  }
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.66rem;
+    letter-spacing: 0.09em; text-transform: uppercase; padding: 0.22rem 0.52rem;
+    border-radius: 2px; background: var(--tone-soft, var(--accent-soft));
+    color: var(--tone, var(--accent)); white-space: nowrap;
+  }
+  .filter-body { padding: 1.3rem; display: flex; flex-direction: column; gap: 1.2rem; }
+
+  .targets {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.79rem;
+    line-height: 1.7; color: var(--ink-soft); background: var(--surface-alt);
+    border-radius: 3px; padding: 0.75rem 0.95rem; overflow-x: auto;
+  }
+  .targets b {
+    display: block; font-family: "Source Sans 3", sans-serif; font-size: 0.69rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+    font-weight: 600; margin-bottom: 0.3rem;
+  }
+
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+  caption {
+    text-align: left; font-size: 0.69rem; letter-spacing: 0.1em; text-transform: uppercase;
+    font-weight: 600; color: var(--ink-faint); padding-bottom: 0.45rem;
+  }
+  th, td {
+    text-align: left; padding: 0.55rem 0.8rem 0.55rem 0;
+    border-bottom: 1px solid var(--rule); vertical-align: top;
+  }
+  th {
+    font-size: 0.71rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  td.num, th.num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  td.thr { color: var(--cut); font-weight: 500; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+  .fig-shell {
+    background: var(--surface-alt); border-radius: 3px; padding: 0.9rem 0.7rem 0.5rem;
+    overflow-x: auto;
+  }
+  svg { display: block; max-width: 100%; height: auto; }
+  figcaption { font-size: 0.86rem; color: var(--ink-soft); max-width: var(--measure); }
+  .fig-stats {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.3rem;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.74rem;
+    color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+  .fig-stats b { color: var(--ink-soft); font-weight: 500; }
+
+  .note {
+    background: var(--accent-soft); border-radius: 4px; padding: 1.05rem 1.25rem;
+    display: flex; flex-direction: column; gap: 0.45rem;
+  }
+  .note.warn { background: var(--cut-soft); }
+  .note h3 {
+    font-family: "Zilla Slab", Georgia, serif; font-size: 1.05rem; margin: 0; color: var(--accent);
+  }
+  .note.warn h3 { color: var(--cut); }
+  .note p { font-size: 0.96rem; }
+
+  footer {
+    border-top: 1px solid var(--rule); padding-top: 1.2rem; font-size: 0.85rem;
+    color: var(--ink-faint); display: flex; flex-direction: column; gap: 0.3rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">PatchCrop field experiment &middot; soil sensor quality control</p>
+    <h1>How the quality screens work</h1>
+    <p class="standfirst">
+      Three screens run over every soil-probe reading between download and the published file.
+      This page describes what each one targets and the rule it applies. How much each one removed is measured by
+      running the pipeline twice over 2021&ndash;2024, once with the screens and once without, and
+      comparing the two outputs cell by cell.
+    </p>
+  </header>
+
+  <section>
+    <h2>Order of operations</h2>
+    <p class="lede">
+      The screens run in the sequence given on the command line, each handing its result to the
+      next. Nothing here deletes records: screen&nbsp;1 removes two whole columns, and the other
+      two set individual readings to null, leaving the 20-minute time base intact.
+    </p>
+    <figure>
+      <div class="fig-shell"><svg viewBox="0 0 660 96" role="img" aria-label="Processing order: download per chunk, sensor mapping, housekeeping removal, conductivity screen, water content screen (inoperative), write CSV.">
+          <g font-family="IBM Plex Mono, monospace" font-size="10.5" text-anchor="middle">
+            <g fill="var(--surface)" stroke="var(--viz-s1)" stroke-width="1.5">
+              <rect x="4" y="30" width="92" height="34" rx="3"/>
+              <rect x="116" y="30" width="92" height="34" rx="3"/>
+              <rect x="228" y="30" width="92" height="34" rx="3"/>
+              <rect x="340" y="30" width="92" height="34" rx="3"/>
+              <rect x="564" y="30" width="92" height="34" rx="3"/>
+            </g>
+            <rect x="452" y="30" width="92" height="34" rx="3" fill="var(--surface)" stroke="var(--viz-cut)" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <g fill="var(--ink)">
+              <text x="50" y="45">download</text><text x="50" y="57">per chunk</text>
+              <text x="162" y="45">sensor</text><text x="162" y="57">mapping</text>
+              <text x="274" y="45">screen 1</text><text x="274" y="57">housekeeping</text>
+              <text x="386" y="45">screen 2</text><text x="386" y="57">conductivity</text>
+              <text x="610" y="45">write</text><text x="610" y="57">CSV</text>
+            </g>
+            <g fill="var(--viz-cut)">
+              <text x="498" y="45">screen 3</text><text x="498" y="57">inoperative</text>
+            </g>
+            <g stroke="var(--viz-axis)" stroke-width="1.5" fill="var(--viz-axis)">
+              <line x1="96" y1="47" x2="112" y2="47"/><polygon points="116,47 108,43 108,51"/>
+              <line x1="208" y1="47" x2="224" y2="47"/><polygon points="228,47 220,43 220,51"/>
+              <line x1="320" y1="47" x2="336" y2="47"/><polygon points="340,47 332,43 332,51"/>
+              <line x1="432" y1="47" x2="448" y2="47"/><polygon points="452,47 444,43 444,51"/>
+              <line x1="544" y1="47" x2="560" y2="47"/><polygon points="564,47 556,43 556,51"/>
+            </g>
+            <text x="274" y="18" fill="var(--viz-muted)" font-size="9.5">removes columns</text>
+            <text x="442" y="82" fill="var(--viz-muted)" font-size="9.5">null individual readings</text>
+          </g>
+        </svg></div>
+      <figcaption>
+        The mapping step runs first and fixes the column names that everything downstream matches
+        on &mdash; which is why a probe missing from the sensor mapping is also missed by the
+        screens.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Measurands and screening coverage</h2>
+    <p class="lede">
+      Each stationary probe reports five measurands at two lateral positions and three depths
+      &mdash; 30 columns. Only two of the five are screened for plausibility; the other three are
+      published exactly as recorded.
+    </p>
+    <div class="tbl">
+      <table>
+        <caption>Per stationary probe</caption>
+        <thead>
+          <tr><th>Measurand</th><th>Unit</th><th class="num">Columns</th><th>Screening applied</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>bulk_conductivity</td><td>µS/cm</td><td class="num">6</td><td>Drift screen &mdash; three rules</td></tr>
+          <tr><td>water_content</td><td>vol. %</td><td class="num">6</td><td>Transient-spike screen</td></tr>
+          <tr><td>soil_temperature</td><td>°C</td><td class="num">6</td><td>None</td></tr>
+          <tr><td>permittivity</td><td>dimensionless</td><td class="num">6</td><td>None</td></tr>
+          <tr><td>pore_water_conductivity</td><td>µS/cm</td><td class="num">6</td><td>None</td></tr>
+          <tr><td>battery_voltage, signal_strength</td><td>V, dBm</td><td class="num">2</td><td>Removed entirely</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Screen 1 &mdash; Instrument housekeeping</h2>
+    <article class="filter">
+      <header>
+        <h3>Non-measurement channels</h3>
+        <span class="chip">Columns removed</span>
+      </header>
+      <div class="filter-body">
+        <p>
+          Battery voltage and radio signal strength describe logger state, not soil state. Both
+          columns are dropped before either value screen sees the record.
+        </p>
+        <div class="targets"><b>Removed</b>battery_voltage (V) &middot; signal_strength (dBm)</div>
+        <p style="font-size:0.95rem;color:var(--ink-soft);">
+          Each named column is dropped in turn. A name that is not present is reported and skipped,
+          so a probe reporting neither channel passes through unchanged rather than failing.
+        </p>
+      </div>
+    </article>
+  </section>
+
+  <section>
+    <h2>Screen 2 &mdash; Bulk conductivity drift</h2>
+    <p class="lede">
+      Electrodes lose contact with the soil matrix as it shrinks, cracks or settles, and a poorly
+      coupled electrode reads high. Three rules test each reading against a reference it should
+      agree with: an absolute physical ceiling, its laterally paired probe, and the layer directly
+      above it.
+    </p>
+
+    <article class="filter" style="--tone: var(--accent); --tone-soft: var(--accent-soft);">
+      <header>
+        <h3>Rule set</h3>
+        <span class="chip">Values nulled</span>
+      </header>
+      <div class="filter-body">
+        <div class="targets">
+          <b>Screened &mdash; 6 columns</b>
+          bulk_conductivity_{left|right}_{30|60|90}_cm
+        </div>
+        <div class="tbl">
+          <table>
+            <caption>Applied per record</caption>
+            <thead><tr><th>Rule</th><th class="num">Threshold</th><th>Reading nulled</th></tr></thead>
+            <tbody>
+              <tr><td>Absolute ceiling</td><td class="num thr">&gt; 300 µS/cm</td><td>The offending reading</td></tr>
+              <tr><td>Lateral disagreement</td><td class="num thr">&gt; 50 µS/cm</td><td>Whichever of the pair is higher</td></tr>
+              <tr><td>Depth inversion</td><td class="num thr">&gt; +80 µS/cm</td><td>The deeper reading, at 60 and 90 cm</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure>
+          <div class="fig-shell"><svg viewBox="0 0 520 200" role="img" aria-label="Probe pair at 30, 60 and 90 cm. Each depth is compared sideways against its partner probe with a 50 limit, and downwards against the layer above with an 80 limit.">
+              <g font-family="IBM Plex Mono, monospace" font-size="11">
+                <text x="8" y="52" fill="var(--viz-muted)">30 cm</text>
+                <text x="8" y="107" fill="var(--viz-muted)">60 cm</text>
+                <text x="8" y="162" fill="var(--viz-muted)">90 cm</text>
+                <text x="150" y="22" fill="var(--viz-muted)" text-anchor="middle">LEFT</text>
+                <text x="370" y="22" fill="var(--viz-muted)" text-anchor="middle">RIGHT</text>
+              </g>
+              <g>
+                <rect x="70" y="32" width="380" height="42" fill="var(--viz-s1)" opacity="0.06"/>
+                <rect x="70" y="87" width="380" height="42" fill="var(--viz-s1)" opacity="0.10"/>
+                <rect x="70" y="142" width="380" height="42" fill="var(--viz-s1)" opacity="0.14"/>
+              </g>
+              <g stroke="var(--viz-cut)" stroke-width="1.5" fill="none" stroke-dasharray="4 3">
+                <line x1="168" y1="53" x2="352" y2="53"/>
+                <line x1="168" y1="108" x2="352" y2="108"/>
+                <line x1="168" y1="163" x2="352" y2="163"/>
+              </g>
+              <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--viz-cut)" text-anchor="middle">
+                <text x="260" y="48">&gt; 50 apart</text>
+                <text x="260" y="103">&gt; 50 apart</text>
+                <text x="260" y="158">&gt; 50 apart</text>
+              </g>
+              <g stroke="var(--viz-cut)" stroke-width="1.5" fill="none">
+                <line x1="120" y1="66" x2="120" y2="95"/><line x1="120" y1="121" x2="120" y2="150"/>
+                <line x1="400" y1="66" x2="400" y2="95"/><line x1="400" y1="121" x2="400" y2="150"/>
+              </g>
+              <g fill="var(--viz-cut)">
+                <polygon points="120,99 116,91 124,91"/><polygon points="120,154 116,146 124,146"/>
+                <polygon points="400,99 396,91 404,91"/><polygon points="400,154 396,146 404,146"/>
+              </g>
+              <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--viz-cut)">
+                <text x="128" y="84">&gt; +80</text><text x="128" y="139">&gt; +80</text>
+              </g>
+              <g fill="var(--surface)" stroke="var(--viz-s1)" stroke-width="2">
+                <circle cx="150" cy="53" r="9"/><circle cx="150" cy="108" r="9"/><circle cx="150" cy="163" r="9"/>
+                <circle cx="370" cy="53" r="9"/><circle cx="370" cy="108" r="9"/><circle cx="370" cy="163" r="9"/>
+              </g>
+            </svg></div>
+          <figcaption>
+            The two comparison axes. Every depth is tested sideways against its partner probe, and
+            each of the lower two is tested downwards against the layer above it.
+          </figcaption>
+        </figure>
+
+        <div>
+          <p style="margin-bottom:0.6rem;"><strong>How a record is evaluated</strong></p>
+          <ol style="margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:0.4rem;max-width:var(--measure);">
+            <li>Work through the three depths in turn, 30&nbsp;cm first.</li>
+            <li>At each depth, test both probes: a reading is nulled if it exceeds 300&nbsp;µS/cm outright, or if it sits more than 50&nbsp;µS/cm above its partner. Only the higher of a disagreeing pair is removed &mdash; the lower one is assumed sound.</li>
+            <li>At 60 and 90&nbsp;cm only, compare against the layer directly above. If the deeper reading exceeds it by more than 80&nbsp;µS/cm, the deeper one is nulled.</li>
+            <li>The depth test is skipped where the reading was already nulled in step 2, so a single bad value is never counted twice.</li>
+            <li>Nulls are passed over throughout; a missing reading is never treated as a failure.</li>
+          </ol>
+          <p style="margin-top:0.7rem;font-size:0.95rem;color:var(--ink-soft);">
+            The depth rule is one-sided. It removes a reading that is implausibly <em>high</em> for
+            its depth, but a reading implausibly <em>low</em> passes untouched.
+          </p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section>
+    <h2>Screen 3 &mdash; Transient water-content spikes <span style="color:var(--cut);font-size:0.75em;font-weight:600;">NOT IN EFFECT</span></h2>
+    <p class="lede">
+      Soil moisture responds gradually to wetting and drying. A reading that rises abruptly and
+      falls straight back is treated as sensor error; one that rises and persists is treated as a
+      real wetting event. Duration alone separates the two.
+    </p>
+
+    <div class="note warn">
+      <h3>This screen does not currently run</h3>
+      <p>
+        The rules below describe intended behaviour. As the code stands they remove nothing: the
+        step rebuilds its per-probe tracker at every reading instead of carrying it forward, so
+        there is never a previous value to compare against and no rise is ever detected. The
+        defect is silent &mdash; the step loads, reports no error, and writes no change log.
+        Confirmed by running the step directly against a textbook spike, which it returns unaltered.
+      </p>
+    </div>
+
+    <article class="filter" style="--tone: var(--alt); --tone-soft: var(--alt-soft);">
+      <header>
+        <h3>Rule set</h3>
+        <span class="chip">Inoperative</span>
+      </header>
+      <div class="filter-body">
+        <div class="targets">
+          <b>Intended targets &mdash; 6 columns</b>
+          water_content_{left|right}_{30|60|90}_cm
+        </div>
+        <div class="tbl">
+          <table>
+            <caption>Applied per probe, forward in time</caption>
+            <thead><tr><th>Condition</th><th class="num">Threshold</th><th>Outcome</th></tr></thead>
+            <tbody>
+              <tr><td>Step rise</td><td class="num thr">&ge; 5 pp</td><td>Opens an excursion; subsequent readings held</td></tr>
+              <tr><td>Step fall, within 10 records</td><td class="num thr">&ge; 5 pp</td><td>Excursion nulled in full</td></tr>
+              <tr><td>Elevation persists</td><td class="num thr">&ge; 10 records</td><td>Retained as a wetting event</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure>
+          <div class="fig-shell"><svg viewBox="0 0 520 170" role="img" aria-label="Two traces. A brief rise that returns to baseline would be removed. A rise that persists beyond ten readings would be kept.">
+              <line x1="30" y1="140" x2="500" y2="140" stroke="var(--viz-grid)" stroke-width="1"/>
+              <rect x="103" y="40" width="69" height="80" fill="var(--viz-cut)" opacity="0.12" rx="2"/>
+              <path d="M30,112 L70,110 L95,112 L110,52 L130,50 L150,54 L165,110 L195,112 L230,110"
+                    fill="none" stroke="var(--viz-cut)" stroke-width="2.5"/>
+              <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--viz-cut)">
+                <text x="103" y="33">would be removed</text><text x="103" y="136">returns within 10 readings</text>
+              </g>
+              <rect x="360" y="40" width="140" height="80" fill="var(--viz-s1)" opacity="0.11" rx="2"/>
+              <path d="M290,112 L330,110 L350,112 L366,54 L390,50 L420,52 L450,50 L480,52 L500,50"
+                    fill="none" stroke="var(--viz-s1)" stroke-width="2.5"/>
+              <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--viz-s1)">
+                <text x="360" y="33">would be kept</text><text x="360" y="136">stays elevated</text>
+              </g>
+            </svg></div>
+          <figcaption>
+            Intended behaviour. The same rise is judged by how long it lasts &mdash; a return to
+            baseline marks it as sensor error, persistence marks it as a wetting event.
+          </figcaption>
+        </figure>
+
+        <div>
+          <p style="margin-bottom:0.6rem;"><strong>How the rule is meant to work</strong></p>
+          <ol style="margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:0.4rem;max-width:var(--measure);">
+            <li>Each probe and depth is tracked separately, walking forward through time and holding the previous reading.</li>
+            <li>A rise of 5&nbsp;pp or more over that previous reading opens an excursion, and the reading is marked as provisional.</li>
+            <li>While an excursion is open every following reading is marked too, however small its own step.</li>
+            <li>A fall of 5&nbsp;pp or more closes the excursion and nulls everything marked since it opened.</li>
+            <li>If instead it stays elevated for 10 readings &mdash; a little over three hours &mdash; the marks are discarded and the readings kept as a genuine wetting event.</li>
+            <li>A null reading clears the tracker, so an excursion is never carried across a gap.</li>
+          </ol>
+          <p style="margin-top:0.7rem;font-size:0.95rem;color:var(--ink-soft);">
+            Step&nbsp;1 is where it fails: the tracker is rebuilt from scratch at every reading rather
+            than carried forward, so there is never a previous value and step&nbsp;2 never fires.
+          </p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+
+  <section>
+    <h2>What the screens removed</h2>
+    <p class="lede">
+      Two complete runs over the same 54 probes and the same four years, identical but for the two
+      value screens, compared cell by cell. Both runs produced the same rows and columns, and no
+      value was ever altered or added &mdash; every difference is a removal.
+    </p>
+
+    <dl class="scope">
+      <div><dt>Cells compared</dt><dd>98.1M<small>81.1M carrying a value</small></dd></div>
+      <div><dt>Removed</dt><dd>2.91M<small>3.6% of all values</small></dd></div>
+      <div><dt>Of bulk conductivity</dt><dd>18.8%<small>the only measurand touched</small></dd></div>
+      <div><dt>Of water content</dt><dd>0<small>screen 3 inoperative</small></dd></div>
+    </dl>
+
+    <p class="lede">
+      Screening falls entirely on bulk conductivity, where nearly one reading in five was withdrawn.
+      Not a single water-content value was removed across 15 million readings, confirming from the
+      data what the code inspection showed.
+    </p>
+
+    <div class="tbl">
+      <table>
+        <caption>Which rule removed each value</caption>
+        <thead><tr><th>Rule</th><th class="num">Values removed</th><th class="num">Share</th></tr></thead>
+        <tbody>
+          <tr><td>Lateral disagreement &gt; 50</td><td class="num">1,759,902</td><td class="num">60.5%</td></tr>
+          <tr><td>Depth inversion &gt; +80</td><td class="num">929,558</td><td class="num">32.0%</td></tr>
+          <tr><td>Absolute ceiling &gt; 300</td><td class="num">219,607</td><td class="num">7.5%</td></tr>
+          <tr><td>Unattributed</td><td class="num">0</td><td class="num">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn">
+      <h3>The thresholds are not permissive &mdash; they cut into the body of the distribution</h3>
+      <p>
+        Measured on unscreened data, <strong>26.2%</strong> of laterally paired readings differ by
+        more than 50&nbsp;µS/cm and <strong>21.1%</strong> of depth steps exceed +80&nbsp;µS/cm.
+        These are not rare tail events. Only the absolute ceiling behaves like an outlier filter,
+        catching 1.4% of readings.
+      </p>
+      <p>
+        An earlier version of this page argued the opposite, reading quantiles off the screened
+        output. That reasoning was circular: the screened distribution ends at the threshold because
+        the screen put it there. Nothing about reach can be inferred from it.
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-shell"><svg viewBox="0 0 660 224" role="img" aria-labelledby="d1-t"><title id="d1-t">bulk conductivity (µS/cm), before and after screening</title>
+<line x1="52" y1="176.6" x2="644" y2="176.6" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="180.1" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">1</text>
+<line x1="52" y1="158.3" x2="644" y2="158.3" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="161.8" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10</text>
+<line x1="52" y1="134.5" x2="644" y2="134.5" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="138.0" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">100</text>
+<line x1="52" y1="109.9" x2="644" y2="109.9" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="113.4" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^3</text>
+<line x1="52" y1="85.2" x2="644" y2="85.2" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="88.7" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^4</text>
+<line x1="52" y1="60.5" x2="644" y2="60.5" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="64.0" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^5</text>
+<line x1="52" y1="35.8" x2="644" y2="35.8" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="39.3" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^6</text>
+<rect x="53.0" y="39.9" width="12.1" height="144.1" rx="2" fill="var(--viz-s1)"><title>0-10 uS/cm: 683,477 retained</title></rect>
+<rect x="67.1" y="28.7" width="12.1" height="155.3" rx="2" fill="var(--viz-s1)"><title>10-20 uS/cm: 1,939,230 retained</title></rect>
+<rect x="81.2" y="26.0" width="12.1" height="158.0" rx="2" fill="var(--viz-s1)"><title>20-30 uS/cm: 2,496,024 retained</title></rect>
+<rect x="95.3" y="27.7" width="12.1" height="156.3" rx="2" fill="var(--viz-s1)"><title>30-40 uS/cm: 2,130,356 retained</title></rect>
+<rect x="109.4" y="33.2" width="12.1" height="150.8" rx="2" fill="var(--viz-s1)"><title>40-50 uS/cm: 1,278,403 retained</title></rect>
+<rect x="123.5" y="36.6" width="12.1" height="0.8" rx="2" fill="var(--viz-s2)"><title>50-60 uS/cm: 1,062 removed of 929,735</title></rect>
+<rect x="123.5" y="36.6" width="12.1" height="147.4" rx="2" fill="var(--viz-s1)"><title>50-60 uS/cm: 928,673 retained</title></rect>
+<rect x="137.6" y="39.0" width="12.1" height="0.8" rx="2" fill="var(--viz-s2)"><title>60-70 uS/cm: 11,621 removed of 741,603</title></rect>
+<rect x="137.6" y="39.2" width="12.1" height="144.8" rx="2" fill="var(--viz-s1)"><title>60-70 uS/cm: 729,982 retained</title></rect>
+<rect x="151.7" y="43.4" width="12.1" height="0.8" rx="2" fill="var(--viz-s2)"><title>70-80 uS/cm: 35,249 removed of 494,735</title></rect>
+<rect x="151.7" y="44.2" width="12.1" height="139.8" rx="2" fill="var(--viz-s1)"><title>70-80 uS/cm: 459,486 retained</title></rect>
+<rect x="165.8" y="45.8" width="12.1" height="0.8" rx="2" fill="var(--viz-s2)"><title>80-90 uS/cm: 45,391 removed of 393,425</title></rect>
+<rect x="165.8" y="47.1" width="12.1" height="136.9" rx="2" fill="var(--viz-s1)"><title>80-90 uS/cm: 348,034 retained</title></rect>
+<rect x="179.9" y="46.6" width="12.1" height="0.8" rx="2" fill="var(--viz-s2)"><title>90-100 uS/cm: 76,951 removed of 364,691</title></rect>
+<rect x="179.9" y="49.2" width="12.1" height="134.8" rx="2" fill="var(--viz-s1)"><title>90-100 uS/cm: 287,740 retained</title></rect>
+<rect x="194.0" y="47.2" width="12.1" height="3.6" rx="2" fill="var(--viz-s2)"><title>100-110 uS/cm: 141,274 removed of 346,792</title></rect>
+<rect x="194.0" y="52.8" width="12.1" height="131.2" rx="2" fill="var(--viz-s1)"><title>100-110 uS/cm: 205,518 retained</title></rect>
+<rect x="208.0" y="47.3" width="12.1" height="6.5" rx="2" fill="var(--viz-s2)"><title>110-120 uS/cm: 187,458 removed of 342,626</title></rect>
+<rect x="208.0" y="55.8" width="12.1" height="128.2" rx="2" fill="var(--viz-s1)"><title>110-120 uS/cm: 155,168 retained</title></rect>
+<rect x="222.1" y="47.1" width="12.1" height="9.8" rx="2" fill="var(--viz-s2)"><title>120-130 uS/cm: 233,548 removed of 350,566</title></rect>
+<rect x="222.1" y="58.8" width="12.1" height="125.2" rx="2" fill="var(--viz-s1)"><title>120-130 uS/cm: 117,018 retained</title></rect>
+<rect x="236.2" y="47.1" width="12.1" height="9.1" rx="2" fill="var(--viz-s2)"><title>130-140 uS/cm: 225,986 removed of 349,952</title></rect>
+<rect x="236.2" y="58.2" width="12.1" height="125.8" rx="2" fill="var(--viz-s1)"><title>130-140 uS/cm: 123,966 retained</title></rect>
+<rect x="250.3" y="47.3" width="12.1" height="9.9" rx="2" fill="var(--viz-s2)"><title>140-150 uS/cm: 230,055 removed of 344,022</title></rect>
+<rect x="250.3" y="59.1" width="12.1" height="124.9" rx="2" fill="var(--viz-s1)"><title>140-150 uS/cm: 113,967 retained</title></rect>
+<rect x="264.4" y="48.0" width="12.1" height="10.4" rx="2" fill="var(--viz-s2)"><title>150-160 uS/cm: 220,445 removed of 322,165</title></rect>
+<rect x="264.4" y="60.3" width="12.1" height="123.7" rx="2" fill="var(--viz-s1)"><title>150-160 uS/cm: 101,720 retained</title></rect>
+<rect x="278.5" y="48.4" width="12.1" height="11.7" rx="2" fill="var(--viz-s2)"><title>160-170 uS/cm: 222,259 removed of 308,238</title></rect>
+<rect x="278.5" y="62.1" width="12.1" height="121.9" rx="2" fill="var(--viz-s1)"><title>160-170 uS/cm: 85,979 retained</title></rect>
+<rect x="292.6" y="51.3" width="12.1" height="12.2" rx="2" fill="var(--viz-s2)"><title>170-180 uS/cm: 173,021 removed of 236,098</title></rect>
+<rect x="292.6" y="65.5" width="12.1" height="118.5" rx="2" fill="var(--viz-s1)"><title>170-180 uS/cm: 63,077 retained</title></rect>
+<rect x="306.7" y="51.3" width="12.1" height="10.6" rx="2" fill="var(--viz-s2)"><title>180-190 uS/cm: 162,515 removed of 235,174</title></rect>
+<rect x="306.7" y="63.9" width="12.1" height="120.1" rx="2" fill="var(--viz-s1)"><title>180-190 uS/cm: 72,659 retained</title></rect>
+<rect x="320.8" y="53.4" width="12.1" height="10.2" rx="2" fill="var(--viz-s2)"><title>190-200 uS/cm: 131,994 removed of 194,405</title></rect>
+<rect x="320.8" y="65.6" width="12.1" height="118.4" rx="2" fill="var(--viz-s1)"><title>190-200 uS/cm: 62,411 retained</title></rect>
+<rect x="334.9" y="56.6" width="12.1" height="12.0" rx="2" fill="var(--viz-s2)"><title>200-210 uS/cm: 105,299 removed of 144,248</title></rect>
+<rect x="334.9" y="70.6" width="12.1" height="113.4" rx="2" fill="var(--viz-s1)"><title>200-210 uS/cm: 38,949 retained</title></rect>
+<rect x="349.0" y="58.1" width="12.1" height="11.2" rx="2" fill="var(--viz-s2)"><title>210-220 uS/cm: 88,455 removed of 125,183</title></rect>
+<rect x="349.0" y="71.3" width="12.1" height="112.7" rx="2" fill="var(--viz-s1)"><title>210-220 uS/cm: 36,728 retained</title></rect>
+<rect x="363.1" y="59.7" width="12.1" height="10.6" rx="2" fill="var(--viz-s2)"><title>220-230 uS/cm: 74,403 removed of 107,502</title></rect>
+<rect x="363.1" y="72.4" width="12.1" height="111.6" rx="2" fill="var(--viz-s1)"><title>220-230 uS/cm: 33,099 retained</title></rect>
+<rect x="377.2" y="62.0" width="12.1" height="15.3" rx="2" fill="var(--viz-s2)"><title>230-240 uS/cm: 69,576 removed of 86,934</title></rect>
+<rect x="377.2" y="79.3" width="12.1" height="104.7" rx="2" fill="var(--viz-s1)"><title>230-240 uS/cm: 17,358 retained</title></rect>
+<rect x="391.3" y="62.6" width="12.1" height="19.2" rx="2" fill="var(--viz-s2)"><title>240-250 uS/cm: 70,595 removed of 81,963</title></rect>
+<rect x="391.3" y="83.8" width="12.1" height="100.2" rx="2" fill="var(--viz-s1)"><title>240-250 uS/cm: 11,368 retained</title></rect>
+<rect x="405.4" y="64.4" width="12.1" height="20.7" rx="2" fill="var(--viz-s2)"><title>250-260 uS/cm: 61,444 removed of 69,817</title></rect>
+<rect x="405.4" y="87.1" width="12.1" height="96.9" rx="2" fill="var(--viz-s1)"><title>250-260 uS/cm: 8,373 retained</title></rect>
+<rect x="419.5" y="69.8" width="12.1" height="22.5" rx="2" fill="var(--viz-s2)"><title>260-270 uS/cm: 37,774 removed of 42,068</title></rect>
+<rect x="419.5" y="94.3" width="12.1" height="89.7" rx="2" fill="var(--viz-s1)"><title>260-270 uS/cm: 4,294 retained</title></rect>
+<rect x="433.6" y="73.1" width="12.1" height="24.9" rx="2" fill="var(--viz-s2)"><title>270-280 uS/cm: 28,445 removed of 30,967</title></rect>
+<rect x="433.6" y="100.0" width="12.1" height="84.0" rx="2" fill="var(--viz-s1)"><title>270-280 uS/cm: 2,522 retained</title></rect>
+<rect x="447.7" y="74.9" width="12.1" height="30.0" rx="2" fill="var(--viz-s2)"><title>280-290 uS/cm: 24,769 removed of 26,092</title></rect>
+<rect x="447.7" y="106.9" width="12.1" height="77.1" rx="2" fill="var(--viz-s1)"><title>280-290 uS/cm: 1,323 retained</title></rect>
+<rect x="461.8" y="74.2" width="12.1" height="36.1" rx="2" fill="var(--viz-s2)"><title>290-300 uS/cm: 27,010 removed of 27,807</title></rect>
+<rect x="461.8" y="112.3" width="12.1" height="71.7" rx="2" fill="var(--viz-s1)"><title>290-300 uS/cm: 797 retained</title></rect>
+<rect x="475.9" y="77.0" width="12.1" height="49.4" rx="2" fill="var(--viz-s2)"><title>300-310 uS/cm: 21,226 removed of 21,403</title></rect>
+<rect x="475.9" y="128.4" width="12.1" height="55.6" rx="2" fill="var(--viz-s1)"><title>300-310 uS/cm: 177 retained</title></rect>
+<rect x="490.0" y="80.2" width="12.1" height="101.8" rx="2" fill="var(--viz-s2)"><title>310-320 uS/cm: 16,012 removed of 16,012</title></rect>
+<rect x="504.0" y="83.0" width="12.1" height="99.0" rx="2" fill="var(--viz-s2)"><title>320-330 uS/cm: 12,235 removed of 12,235</title></rect>
+<rect x="518.1" y="82.4" width="12.1" height="99.6" rx="2" fill="var(--viz-s2)"><title>330-340 uS/cm: 12,977 removed of 12,977</title></rect>
+<rect x="532.2" y="84.2" width="12.1" height="97.8" rx="2" fill="var(--viz-s2)"><title>340-350 uS/cm: 10,934 removed of 10,934</title></rect>
+<rect x="546.3" y="79.9" width="12.1" height="102.1" rx="2" fill="var(--viz-s2)"><title>350-360 uS/cm: 16,433 removed of 16,433</title></rect>
+<rect x="560.4" y="80.3" width="12.1" height="101.7" rx="2" fill="var(--viz-s2)"><title>360-370 uS/cm: 15,845 removed of 15,845</title></rect>
+<rect x="574.5" y="82.9" width="12.1" height="99.1" rx="2" fill="var(--viz-s2)"><title>370-380 uS/cm: 12,457 removed of 12,457</title></rect>
+<rect x="588.6" y="86.5" width="12.1" height="95.5" rx="2" fill="var(--viz-s2)"><title>380-390 uS/cm: 8,888 removed of 8,888</title></rect>
+<rect x="602.7" y="83.8" width="12.1" height="98.2" rx="2" fill="var(--viz-s2)"><title>390-400 uS/cm: 11,410 removed of 11,410</title></rect>
+<rect x="616.8" y="85.5" width="12.1" height="96.5" rx="2" fill="var(--viz-s2)"><title>400-410 uS/cm: 9,713 removed of 9,713</title></rect>
+<rect x="630.9" y="82.5" width="12.1" height="99.5" rx="2" fill="var(--viz-s2)"><title>410-420 uS/cm: 12,905 removed of 12,905</title></rect>
+<line x1="52" y1="184" x2="644" y2="184" stroke="var(--viz-axis)" stroke-width="1"/>
+<text x="52.0" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">0</text>
+<text x="170.4" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">84</text>
+<text x="288.8" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">168</text>
+<text x="407.2" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">252</text>
+<text x="525.6" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">336</text>
+<text x="644.0" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">420</text>
+<text x="348" y="220" text-anchor="middle" font-size="10" fill="var(--viz-muted)">bulk conductivity (µS/cm)</text>
+<line x1="474.9" y1="22" x2="474.9" y2="184" stroke="var(--viz-cut)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="480.9" y="34" text-anchor="start" font-size="10" font-weight="600" fill="var(--viz-cut)" font-family="IBM Plex Mono, monospace">ceiling 300</text>
+<g font-size="9.5" font-family="IBM Plex Mono, monospace"><rect x="52" y="6" width="9" height="9" rx="2" fill="var(--viz-s1)"/><text x="66" y="14" fill="var(--viz-muted)">retained</text><rect x="128" y="6" width="9" height="9" rx="2" fill="var(--viz-s2)"/><text x="142" y="14" fill="var(--viz-muted)">removed by screen</text></g>
+<text x="644" y="178" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">tail to 64,250 off scale</text>
+</svg></div>
+      <figcaption>
+        Bulk conductivity before and after screening. Unscreened readings run to 64,250&nbsp;µS/cm;
+        1.4% exceed the ceiling. Removals above 300 are the ceiling rule, those below it the two
+        comparison rules.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="fig-shell"><svg viewBox="0 0 660 224" role="img" aria-labelledby="d2-t"><title id="d2-t">| left - right | at equal depth (µS/cm), before and after screening</title>
+<line x1="52" y1="176.6" x2="644" y2="176.6" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="180.1" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">1</text>
+<line x1="52" y1="158.4" x2="644" y2="158.4" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="161.9" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10</text>
+<line x1="52" y1="134.6" x2="644" y2="134.6" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="138.1" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">100</text>
+<line x1="52" y1="110.1" x2="644" y2="110.1" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="113.6" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^3</text>
+<line x1="52" y1="85.5" x2="644" y2="85.5" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="89.0" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^4</text>
+<line x1="52" y1="60.9" x2="644" y2="60.9" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="64.4" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^5</text>
+<line x1="52" y1="36.2" x2="644" y2="36.2" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="39.7" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^6</text>
+<rect x="53.0" y="26.0" width="26.2" height="0.8" rx="2" fill="var(--viz-s2)"><title>0-10 uS/cm: 111,167 removed of 2,606,017</title></rect>
+<rect x="53.0" y="26.5" width="26.2" height="157.5" rx="2" fill="var(--viz-s1)"><title>0-10 uS/cm: 2,494,850 retained</title></rect>
+<rect x="81.2" y="33.2" width="26.2" height="0.8" rx="2" fill="var(--viz-s2)"><title>10-20 uS/cm: 122,782 removed of 1,325,507</title></rect>
+<rect x="81.2" y="34.3" width="26.2" height="149.7" rx="2" fill="var(--viz-s1)"><title>10-20 uS/cm: 1,202,725 retained</title></rect>
+<rect x="109.4" y="39.6" width="26.2" height="0.8" rx="2" fill="var(--viz-s2)"><title>20-30 uS/cm: 104,091 removed of 734,077</title></rect>
+<rect x="109.4" y="41.2" width="26.2" height="142.8" rx="2" fill="var(--viz-s1)"><title>20-30 uS/cm: 629,986 retained</title></rect>
+<rect x="137.6" y="44.8" width="26.2" height="0.8" rx="2" fill="var(--viz-s2)"><title>30-40 uS/cm: 84,078 removed of 450,689</title></rect>
+<rect x="137.6" y="47.0" width="26.2" height="137.0" rx="2" fill="var(--viz-s1)"><title>30-40 uS/cm: 366,611 retained</title></rect>
+<rect x="165.8" y="47.3" width="26.2" height="1.6" rx="2" fill="var(--viz-s2)"><title>40-50 uS/cm: 101,351 removed of 356,431</title></rect>
+<rect x="165.8" y="50.9" width="26.2" height="133.1" rx="2" fill="var(--viz-s1)"><title>40-50 uS/cm: 255,080 retained</title></rect>
+<rect x="194.0" y="49.7" width="26.2" height="25.4" rx="2" fill="var(--viz-s2)"><title>50-60 uS/cm: 263,265 removed of 285,328</title></rect>
+<rect x="194.0" y="77.0" width="26.2" height="107.0" rx="2" fill="var(--viz-s1)"><title>50-60 uS/cm: 22,063 retained</title></rect>
+<rect x="222.1" y="52.3" width="26.2" height="129.7" rx="2" fill="var(--viz-s2)"><title>60-70 uS/cm: 222,343 removed of 222,343</title></rect>
+<rect x="250.3" y="52.8" width="26.2" height="129.2" rx="2" fill="var(--viz-s2)"><title>70-80 uS/cm: 213,102 removed of 213,102</title></rect>
+<rect x="278.5" y="53.8" width="26.2" height="128.2" rx="2" fill="var(--viz-s2)"><title>80-90 uS/cm: 193,863 removed of 193,863</title></rect>
+<rect x="306.7" y="52.4" width="26.2" height="129.6" rx="2" fill="var(--viz-s2)"><title>90-100 uS/cm: 220,382 removed of 220,382</title></rect>
+<rect x="334.9" y="55.9" width="26.2" height="126.1" rx="2" fill="var(--viz-s2)"><title>100-110 uS/cm: 158,848 removed of 158,848</title></rect>
+<rect x="363.1" y="59.5" width="26.2" height="122.5" rx="2" fill="var(--viz-s2)"><title>110-120 uS/cm: 113,294 removed of 113,294</title></rect>
+<rect x="391.3" y="61.5" width="26.2" height="120.5" rx="2" fill="var(--viz-s2)"><title>120-130 uS/cm: 94,699 removed of 94,699</title></rect>
+<rect x="419.5" y="63.1" width="26.2" height="118.9" rx="2" fill="var(--viz-s2)"><title>130-140 uS/cm: 81,375 removed of 81,375</title></rect>
+<rect x="447.7" y="68.2" width="26.2" height="113.8" rx="2" fill="var(--viz-s2)"><title>140-150 uS/cm: 50,248 removed of 50,248</title></rect>
+<rect x="475.9" y="67.5" width="26.2" height="114.5" rx="2" fill="var(--viz-s2)"><title>150-160 uS/cm: 53,877 removed of 53,877</title></rect>
+<rect x="504.0" y="70.3" width="26.2" height="111.7" rx="2" fill="var(--viz-s2)"><title>160-170 uS/cm: 41,309 removed of 41,309</title></rect>
+<rect x="532.2" y="74.0" width="26.2" height="108.0" rx="2" fill="var(--viz-s2)"><title>170-180 uS/cm: 29,371 removed of 29,371</title></rect>
+<rect x="560.4" y="73.0" width="26.2" height="109.0" rx="2" fill="var(--viz-s2)"><title>180-190 uS/cm: 32,211 removed of 32,211</title></rect>
+<rect x="588.6" y="74.1" width="26.2" height="107.9" rx="2" fill="var(--viz-s2)"><title>190-200 uS/cm: 28,925 removed of 28,925</title></rect>
+<rect x="616.8" y="80.2" width="26.2" height="101.8" rx="2" fill="var(--viz-s2)"><title>200-210 uS/cm: 16,468 removed of 16,468</title></rect>
+<line x1="52" y1="184" x2="644" y2="184" stroke="var(--viz-axis)" stroke-width="1"/>
+<text x="52.0" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">0</text>
+<text x="170.4" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">42</text>
+<text x="288.8" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">84</text>
+<text x="407.2" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">126</text>
+<text x="525.6" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">168</text>
+<text x="644.0" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">210</text>
+<text x="348" y="220" text-anchor="middle" font-size="10" fill="var(--viz-muted)">| left - right | at equal depth (µS/cm)</text>
+<line x1="193.0" y1="22" x2="193.0" y2="184" stroke="var(--viz-cut)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="199.0" y="34" text-anchor="start" font-size="10" font-weight="600" fill="var(--viz-cut)" font-family="IBM Plex Mono, monospace">limit 50</text>
+<g font-size="9.5" font-family="IBM Plex Mono, monospace"><rect x="52" y="6" width="9" height="9" rx="2" fill="var(--viz-s1)"/><text x="66" y="14" fill="var(--viz-muted)">retained</text><rect x="128" y="6" width="9" height="9" rx="2" fill="var(--viz-s2)"/><text x="142" y="14" fill="var(--viz-muted)">removed by screen</text></g>
+<text x="644" y="178" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">tail to 64,250 off scale</text>
+</svg></div>
+      <figcaption>
+        Lateral difference between paired probes. The screened view stops at 50 and suggests a rule
+        touching only the extreme tail; the unscreened view shows a quarter of all pairs beyond it,
+        with a median of 17&nbsp;µS/cm and a 90th percentile of 106.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="fig-shell"><svg viewBox="0 0 660 224" role="img" aria-labelledby="d3-t"><title id="d3-t">deeper minus shallower (µS/cm), before and after screening</title>
+<line x1="52" y1="176.6" x2="644" y2="176.6" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="180.1" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">1</text>
+<line x1="52" y1="158.3" x2="644" y2="158.3" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="161.8" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10</text>
+<line x1="52" y1="134.6" x2="644" y2="134.6" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="138.1" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">100</text>
+<line x1="52" y1="110.0" x2="644" y2="110.0" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="113.5" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^3</text>
+<line x1="52" y1="85.3" x2="644" y2="85.3" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="88.8" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^4</text>
+<line x1="52" y1="60.7" x2="644" y2="60.7" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="64.2" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^5</text>
+<line x1="52" y1="36.0" x2="644" y2="36.0" stroke="var(--viz-grid)" stroke-width="1"/>
+<text x="44" y="39.5" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">10^6</text>
+<rect x="53.0" y="93.9" width="21.7" height="43.7" rx="2" fill="var(--viz-s2)"><title>-200--180 uS/cm: 4,439 removed of 4,501</title></rect>
+<rect x="53.0" y="139.6" width="21.7" height="44.4" rx="2" fill="var(--viz-s1)"><title>-200--180 uS/cm: 62 retained</title></rect>
+<rect x="76.7" y="99.7" width="21.7" height="35.0" rx="2" fill="var(--viz-s2)"><title>-180--160 uS/cm: 2,531 removed of 2,613</title></rect>
+<rect x="76.7" y="136.7" width="21.7" height="47.3" rx="2" fill="var(--viz-s1)"><title>-180--160 uS/cm: 82 retained</title></rect>
+<rect x="100.4" y="96.6" width="21.7" height="32.2" rx="2" fill="var(--viz-s2)"><title>-160--140 uS/cm: 3,348 removed of 3,490</title></rect>
+<rect x="100.4" y="130.8" width="21.7" height="53.2" rx="2" fill="var(--viz-s1)"><title>-160--140 uS/cm: 142 retained</title></rect>
+<rect x="124.0" y="81.7" width="21.7" height="37.9" rx="2" fill="var(--viz-s2)"><title>-140--120 uS/cm: 13,729 removed of 14,068</title></rect>
+<rect x="124.0" y="121.6" width="21.7" height="62.4" rx="2" fill="var(--viz-s1)"><title>-140--120 uS/cm: 339 retained</title></rect>
+<rect x="147.7" y="72.2" width="21.7" height="22.2" rx="2" fill="var(--viz-s2)"><title>-120--100 uS/cm: 30,523 removed of 34,064</title></rect>
+<rect x="147.7" y="96.5" width="21.7" height="87.5" rx="2" fill="var(--viz-s1)"><title>-120--100 uS/cm: 3,541 retained</title></rect>
+<rect x="171.4" y="62.5" width="21.7" height="12.5" rx="2" fill="var(--viz-s2)"><title>-100--80 uS/cm: 62,471 removed of 84,140</title></rect>
+<rect x="171.4" y="77.1" width="21.7" height="106.9" rx="2" fill="var(--viz-s1)"><title>-100--80 uS/cm: 21,669 retained</title></rect>
+<rect x="195.1" y="60.4" width="21.7" height="8.6" rx="2" fill="var(--viz-s2)"><title>-80--60 uS/cm: 64,760 removed of 102,964</title></rect>
+<rect x="195.1" y="71.0" width="21.7" height="113.0" rx="2" fill="var(--viz-s1)"><title>-80--60 uS/cm: 38,204 retained</title></rect>
+<rect x="218.8" y="53.5" width="21.7" height="1.7" rx="2" fill="var(--viz-s2)"><title>-60--40 uS/cm: 57,081 removed of 195,086</title></rect>
+<rect x="218.8" y="57.2" width="21.7" height="126.8" rx="2" fill="var(--viz-s1)"><title>-60--40 uS/cm: 138,005 retained</title></rect>
+<rect x="242.4" y="41.2" width="21.7" height="1.2" rx="2" fill="var(--viz-s2)"><title>-40--20 uS/cm: 160,464 removed of 615,809</title></rect>
+<rect x="242.4" y="44.4" width="21.7" height="139.6" rx="2" fill="var(--viz-s1)"><title>-40--20 uS/cm: 455,345 retained</title></rect>
+<rect x="266.1" y="29.5" width="21.7" height="0.8" rx="2" fill="var(--viz-s2)"><title>-20-0 uS/cm: 135,864 removed of 1,829,077</title></rect>
+<rect x="266.1" y="30.4" width="21.7" height="153.6" rx="2" fill="var(--viz-s1)"><title>-20-0 uS/cm: 1,693,213 retained</title></rect>
+<rect x="289.8" y="26.0" width="21.7" height="0.8" rx="2" fill="var(--viz-s2)"><title>0-20 uS/cm: 200,945 removed of 2,544,676</title></rect>
+<rect x="289.8" y="26.9" width="21.7" height="157.1" rx="2" fill="var(--viz-s1)"><title>0-20 uS/cm: 2,343,731 retained</title></rect>
+<rect x="313.5" y="35.0" width="21.7" height="0.8" rx="2" fill="var(--viz-s2)"><title>20-40 uS/cm: 239,643 removed of 1,097,908</title></rect>
+<rect x="313.5" y="37.6" width="21.7" height="146.4" rx="2" fill="var(--viz-s1)"><title>20-40 uS/cm: 858,265 retained</title></rect>
+<rect x="337.2" y="40.0" width="21.7" height="2.1" rx="2" fill="var(--viz-s2)"><title>40-60 uS/cm: 221,812 removed of 691,934</title></rect>
+<rect x="337.2" y="44.1" width="21.7" height="139.9" rx="2" fill="var(--viz-s1)"><title>40-60 uS/cm: 470,122 retained</title></rect>
+<rect x="360.8" y="41.3" width="21.7" height="3.1" rx="2" fill="var(--viz-s2)"><title>60-80 uS/cm: 229,859 removed of 609,151</title></rect>
+<rect x="360.8" y="46.4" width="21.7" height="137.6" rx="2" fill="var(--viz-s1)"><title>60-80 uS/cm: 379,292 retained</title></rect>
+<rect x="384.5" y="41.0" width="21.7" height="34.6" rx="2" fill="var(--viz-s2)"><title>80-100 uS/cm: 608,666 removed of 629,368</title></rect>
+<rect x="384.5" y="77.5" width="21.7" height="106.5" rx="2" fill="var(--viz-s1)"><title>80-100 uS/cm: 20,702 retained</title></rect>
+<rect x="408.2" y="43.0" width="21.7" height="139.0" rx="2" fill="var(--viz-s2)"><title>100-120 uS/cm: 519,246 removed of 519,246</title></rect>
+<rect x="431.9" y="47.2" width="21.7" height="134.8" rx="2" fill="var(--viz-s2)"><title>120-140 uS/cm: 350,881 removed of 350,881</title></rect>
+<rect x="455.6" y="53.8" width="21.7" height="128.2" rx="2" fill="var(--viz-s2)"><title>140-160 uS/cm: 190,117 removed of 190,117</title></rect>
+<rect x="479.2" y="59.0" width="21.7" height="123.0" rx="2" fill="var(--viz-s2)"><title>160-180 uS/cm: 117,040 removed of 117,040</title></rect>
+<rect x="502.9" y="62.1" width="21.7" height="119.9" rx="2" fill="var(--viz-s2)"><title>180-200 uS/cm: 87,435 removed of 87,435</title></rect>
+<rect x="526.6" y="68.4" width="21.7" height="113.6" rx="2" fill="var(--viz-s2)"><title>200-220 uS/cm: 48,776 removed of 48,776</title></rect>
+<rect x="550.3" y="73.9" width="21.7" height="108.1" rx="2" fill="var(--viz-s2)"><title>220-240 uS/cm: 29,017 removed of 29,017</title></rect>
+<rect x="574.0" y="75.9" width="21.7" height="106.1" rx="2" fill="var(--viz-s2)"><title>240-260 uS/cm: 24,190 removed of 24,190</title></rect>
+<rect x="597.6" y="81.3" width="21.7" height="100.7" rx="2" fill="var(--viz-s2)"><title>260-280 uS/cm: 14,525 removed of 14,525</title></rect>
+<rect x="621.3" y="76.4" width="21.7" height="105.6" rx="2" fill="var(--viz-s2)"><title>280-300 uS/cm: 23,016 removed of 23,016</title></rect>
+<line x1="52" y1="184" x2="644" y2="184" stroke="var(--viz-axis)" stroke-width="1"/>
+<text x="52.0" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">-200</text>
+<text x="170.4" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">-100</text>
+<text x="288.8" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">0</text>
+<text x="407.2" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">100</text>
+<text x="525.6" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">200</text>
+<text x="644.0" y="199" text-anchor="middle" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">300</text>
+<text x="348" y="220" text-anchor="middle" font-size="10" fill="var(--viz-muted)">deeper minus shallower (µS/cm)</text>
+<line x1="383.5" y1="22" x2="383.5" y2="184" stroke="var(--viz-cut)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="389.5" y="34" text-anchor="start" font-size="10" font-weight="600" fill="var(--viz-cut)" font-family="IBM Plex Mono, monospace">limit +80</text>
+<g font-size="9.5" font-family="IBM Plex Mono, monospace"><rect x="52" y="6" width="9" height="9" rx="2" fill="var(--viz-s1)"/><text x="66" y="14" fill="var(--viz-muted)">retained</text><rect x="128" y="6" width="9" height="9" rx="2" fill="var(--viz-s2)"/><text x="142" y="14" fill="var(--viz-muted)">removed by screen</text></g>
+<text x="644" y="178" text-anchor="end" font-size="9.5" fill="var(--viz-muted)" font-family="IBM Plex Mono, monospace">tails beyond +/-200 off scale</text>
+</svg></div>
+      <figcaption>
+        Depth step. The one-sided rule is plain here: everything past +80 is removed while the
+        negative side, reaching &minus;61,478&nbsp;µS/cm, is retained in full.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Behaviour worth knowing</h2>
+
+    <div class="note">
+      <h3>A screen only runs where its columns exist</h3>
+      <p>
+        Both value screens require the full set of paired-depth columns. Mobile probes report a
+        single surface horizon at 7&nbsp;cm instead, so the screens find no columns to work on and
+        skip those probes silently &mdash; no warning, no change log. The same applies to any probe
+        absent from the sensor mapping, whose columns keep their raw provider names and therefore
+        match nothing.
+      </p>
+    </div>
+
+    <div class="note">
+      <h3>Thresholds are looser than the software defaults</h3>
+      <p>
+        The ceiling is set to 300&nbsp;µS/cm against a default of 400, and the depth tolerance to
+        80&nbsp;µS/cm against a default of 60 &mdash; the ceiling stricter than stock, the depth
+        tolerance looser. The lateral limit of 50&nbsp;µS/cm is the default, and is the rule that
+        removes the most data.
+        The spike thresholds cannot be configured at all &mdash; 5&nbsp;pp and 10 readings are
+        fixed in the code, and arguments passed to that step are ignored.
+      </p>
+    </div>
+
+    <div class="note">
+      <h3>Null values carry two meanings</h3>
+      <p>
+        A null is either a screened reading or a reading the probe never returned, and the
+        published file does not distinguish them. Only the per-probe change logs record which
+        values a screen removed.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <div>PatchCrop field experiment &middot; soil sensor quality control</div>
+    <div>Removal figures from a paired screened/unscreened run over 2021-01-01 to 2024-12-31, 54 probes, 98.1M cells compared. Screens applied by logstar-stream; for configured thresholds, processing order and known limitations see <code>docs/patchcrop_publication_filters.md</code>.</div>
+  </footer>
+
+</div>

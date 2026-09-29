@@ -34,9 +34,10 @@ class BlacklistFilterColumnsPS(ProcessingStep):
             f"running {self.ps_name} and removing following columns: {columns} ..."
         )
 
-        try:
-            for column in columns:
+        # drop each column independently, a missing one must not stop the rest
+        for column in columns:
+            try:
                 df.drop(column, axis=1, inplace=True)
-        except:
-            logging.error("Could not filter out column: {}".format(column))
+            except KeyError:
+                logging.error("Could not filter out column: {}".format(column))
         return df
